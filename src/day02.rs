@@ -22,26 +22,21 @@ fn main() {
 fn part1(input: &[(i32, i32)]) -> i32 {
     let (horizontal_sum, depth_sum) = input.iter()
         .cloned()
-        .reduce(|(px, py),(cx,cy)|(px+cx,py+cy))
-        .unwrap();
+        .fold((0,0),|(px, py),(cx,cy)|(px+cx,py+cy));
 
     horizontal_sum * depth_sum
 }
 
 fn part2(input: &[(i32, i32)]) -> i32 {
-    let mut h_sum = 0;
-    let mut d_sum = 0;
-    let mut aim = 0;
+    let (horizontal_sum, depth_sum) = input.iter()
+        .cloned()
+        .scan(0, |aim, (x, y)| {
+            *aim += y;
+            Some((x, x * *aim))
+        })
+        .fold((0,0), |(px, py),(cx,cy)|(px+cx,py+cy));
 
-    for (x, y) in input.iter().cloned() {
-        aim += y;
-        if x > 0 {
-            h_sum += x;
-            d_sum += x * aim;
-        }
-    }
-
-    h_sum * d_sum
+    horizontal_sum * depth_sum
 }
 
 fn parse_input(input: &str) -> Vec<(i32, i32)> {
