@@ -31,48 +31,28 @@ pub struct FixedGrid<T> {
 }
 
 impl<T> FixedGrid<T>
-where
-    T: Clone + Copy,
 {
     pub fn width(&self) -> usize {
         self.width
     }
-
     pub fn height(&self) -> usize {
         self.height
     }
-
-    pub fn get(&self, x: usize, y: usize) -> T {
-        *self.data.get(y * self.width + x).unwrap()
-    }
-
-    pub fn get_safe(&self, x: usize, y: usize) -> Option<T> {
-        if x > self.width {
-            None
-        } else if y > self.height {
-            None
-        } else {
-            self.data.get(y * self.width + x).map(|v| *v)
-        }
-    }
-
     pub fn data(&self) -> &[T] {
         return &self.data;
     }
-
-    pub fn set(&mut self, x: usize, y: usize, v: T) {
-        self.data[y * self.width + x] = v;
+    pub fn get(&self, x: usize, y: usize) -> Option<&T> {
+        self.data.get(y * self.width + x)
     }
-
-    pub unsafe fn set_unsafe(&mut self, x: usize, y: usize, v: T) {
-        *self.data.get_unchecked_mut(y * self.width + x) = v;
+    pub unsafe fn get_unchecked(&self, x: usize, y: usize) -> &T {
+        self.data.get_unchecked(y * self.width + x)
     }
-
-    pub fn set_slice(&mut self, x: usize, y: usize, src: &[T]) {
-        let index = y * self.width + x;
-        self.data[index..index + src.len()].copy_from_slice(src);
+    pub fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut T> {
+        self.data.get_mut(y * self.width + x)
     }
-
+    pub unsafe fn get_unchecked_mut(&mut self, x: usize, y: usize) -> &mut T {
+        self.data.get_unchecked_mut(y * self.width + x)
+    }
     pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &T)> {
         let mut y = 0usize;
         let mut x = 0usize;
@@ -90,7 +70,6 @@ where
             (px, py, v)
         })
     }
-
     pub fn limited_iter(
         &self,
         fx: usize,
@@ -119,6 +98,24 @@ where
                 )
             }
         })
+    }
+}
+
+impl<T> FixedGrid<T>
+where
+    T: Clone + Copy,
+{
+    pub fn set(&mut self, x: usize, y: usize, v: T) {
+        self.data[y * self.width + x] = v;
+    }
+
+    pub unsafe fn set_unsafe(&mut self, x: usize, y: usize, v: T) {
+        *self.data.get_unchecked_mut(y * self.width + x) = v;
+    }
+
+    pub fn set_slice(&mut self, x: usize, y: usize, src: &[T]) {
+        let index = y * self.width + x;
+        self.data[index..index + src.len()].copy_from_slice(src);
     }
 
     pub fn new(width: usize, height: usize, def: T) -> FixedGrid<T> {
@@ -154,6 +151,12 @@ where
 
         count
     }
+
+    pub fn find(&self, v: T) -> Option<(usize, usize)> {
+        self.iter()
+            .find(|(_, _, v2)| v == **v2)
+            .map(|(x, y, _)| (x, y))
+    }
 }
 
 impl FixedGrid<char>
@@ -162,7 +165,9 @@ impl FixedGrid<char>
     pub fn print(&self) {
         for y in 0..self.height {
             for x in 0..self.width {
-                print!("{}", self.get(x, y));
+                unsafe {
+                    print!("{}", self.get_unchecked(x, y));
+                }
             }
 
             println!();
