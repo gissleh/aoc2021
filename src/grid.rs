@@ -10,8 +10,8 @@ impl<T> GridSet<T>
         T: Clone + Copy,
 {
     pub fn chunk_index(&self, x: isize, y: isize) -> (isize, isize) {
-        let cx = if x < 0 { x-self.chunk_width-1 } else {x} / self.chunk_width;
-        let cy = if y < 0 { y-self.chunk_width-1 } else {y} / self.chunk_height;
+        let cx = if x < 0 { x - self.chunk_width - 1 } else { x } / self.chunk_width;
+        let cy = if y < 0 { y - self.chunk_width - 1 } else { y } / self.chunk_height;
 
         (cx, cy)
     }
@@ -19,7 +19,7 @@ impl<T> GridSet<T>
     pub fn chunk(&self, ix: isize, iy: isize) -> Option<(&FixedGrid<T>, isize, isize)> {
         self.grids.iter()
             .find(|(_, ix2, iy2)| *ix2 == ix && *iy2 == iy)
-            .map(|(g, ix2, iy2)| (g, ix2 * self.chunk_width, iy2 * self.chunk_height) )
+            .map(|(g, ix2, iy2)| (g, ix2 * self.chunk_width, iy2 * self.chunk_height))
     }
 }
 
@@ -53,7 +53,7 @@ impl<T> FixedGrid<T>
     pub unsafe fn get_unchecked_mut(&mut self, x: usize, y: usize) -> &mut T {
         self.data.get_unchecked_mut(y * self.width + x)
     }
-    pub fn iter(&self) -> impl Iterator<Item = (usize, usize, &T)> {
+    pub fn iter(&self) -> impl Iterator<Item=(usize, usize, &T)> {
         let mut y = 0usize;
         let mut x = 0usize;
 
@@ -76,7 +76,7 @@ impl<T> FixedGrid<T>
         fy: usize,
         tx: usize,
         ty: usize,
-    ) -> impl Iterator<Item = (usize, usize, &T)> {
+    ) -> impl Iterator<Item=(usize, usize, &T)> {
         let w = tx - fx;
         let h = ty - fy;
         let first = (fy * self.width) + fx;
@@ -102,8 +102,8 @@ impl<T> FixedGrid<T>
 }
 
 impl<T> FixedGrid<T>
-where
-    T: Clone + Copy,
+    where
+        T: Clone + Copy,
 {
     pub fn set(&mut self, x: usize, y: usize, v: T) {
         self.data[y * self.width + x] = v;
@@ -138,8 +138,8 @@ where
 }
 
 impl<T> FixedGrid<T>
-where
-    T: Eq,
+    where
+        T: Eq,
 {
     pub fn count(&self, v: T) -> usize {
         let mut count = 0;
@@ -159,6 +159,30 @@ where
     }
 }
 
+impl FixedGrid<u8>
+{
+    #[allow(dead_code)]
+    pub fn print(&self) {
+        for y in 0..self.height {
+            for x in 0..self.width {
+                unsafe {
+                    print!("{}", *self.get_unchecked(x, y) as char);
+                }
+            }
+
+            println!();
+        }
+    }
+
+    pub fn from_str(s: &str) -> FixedGrid<u8> {
+        let width = s.lines().filter(|l| !l.is_empty()).next().unwrap().len();
+        let height = s.lines().filter(|l| !l.is_empty()).count();
+        let data = s.bytes().filter(|c| *c != b'\n' && *c != b'\r').collect();
+
+        FixedGrid::from(width, height, data)
+    }
+}
+
 impl FixedGrid<char>
 {
     #[allow(dead_code)]
@@ -174,7 +198,7 @@ impl FixedGrid<char>
         }
     }
 
-    pub fn parse_str(s: &str) -> FixedGrid<char> {
+    pub fn from_str(s: &str) -> FixedGrid<char> {
         let width = s.lines().filter(|l| !l.is_empty()).next().unwrap().len();
         let height = s.lines().filter(|l| !l.is_empty()).count();
         let data = s.chars().filter(|c| *c != '\n' && *c != '\r').collect();

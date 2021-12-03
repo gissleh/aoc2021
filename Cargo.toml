@@ -109,10 +109,6 @@ path = "src/day24.rs"
 name = "day25"
 path = "src/day25.rs"
 
-[[bin]]
-name = "year2019-day18"
-path = "src/year2019-day18.rs"
-
 [dependencies]
 chrono = "0.4.6"
 time = "0.1.40"

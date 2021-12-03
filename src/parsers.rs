@@ -41,3 +41,14 @@ pub fn parse_usize(s: &str) -> usize {
 
     res
 }
+
+pub fn parse_binary_u32(s: &str) -> u32 {
+    let mut res = 0;
+
+    for c in s.bytes() {
+        res *= 2;
+        res += if c == b'1' {1} else {0};
+    }
+
+    res
+}

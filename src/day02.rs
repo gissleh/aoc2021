@@ -1,5 +1,4 @@
 use common::aoc::{load_input, print_result, print_time, run_many, run_once, print_time_cold};
-use common::parsers::{parse_u32};
 
 fn main() {
     let (input, dur_load) = run_once(|| load_input("day02"));
@@ -43,10 +42,8 @@ fn parse_input(input: &str) -> Vec<(i32, i32)> {
     input.lines()
         .filter(|l| !l.is_empty())
         .map(|v| {
-            let mut split = v.split(' ');
-
-            let dir = split.next().unwrap();
-            let len = parse_u32(split.next().unwrap()) as i32;
+            let (dir, len_str) = v.split_once(' ').unwrap();
+            let len = len_str.parse::<i32>().unwrap();
 
             match dir {
                 "down" => (0, len),
