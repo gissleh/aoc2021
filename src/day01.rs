@@ -1,12 +1,12 @@
-use common::aoc::{load_input, print_result, print_time, run_many, run_once, print_time_cold};
-use common::parsers::parse_u32;
+use common::aoc::{print_result, print_time, run_many, run_once, print_time_cold, load_input_bytes};
+use common::parsers::{parse_u32_list};
 
 fn main() {
-    let (input, dur_load) = run_once(|| load_input("day01"));
+    let (input, dur_load) = run_once(|| load_input_bytes("day01"));
 
     print_time("Load", dur_load);
 
-    let (input, dur_p, dur_pc) = run_many(1000, || parse_input(&input));
+    let (input, dur_p, dur_pc) = run_many(1000, || parse_u32_list(&input));
     let (res_p1, dur_p1, dur_p1c) = run_many(100000, || part1(&input));
     let (res_p2, dur_p2, dur_p2c) = run_many(100000, || part2(&input));
 
@@ -29,11 +29,4 @@ fn part2(input: &[u32]) -> usize {
     // - 0 B B B
     // = A    -B
     input.windows(4).filter(|w| w[3] > w[0]).count()
-}
-
-fn parse_input(input: &str) -> Vec<u32> {
-    input.lines()
-        .filter(|l| !l.is_empty())
-        .map(parse_u32)
-        .collect()
 }
