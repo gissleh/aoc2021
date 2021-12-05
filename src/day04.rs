@@ -1,15 +1,13 @@
-use common::aoc::{print_result, print_time, run_many, run_once, print_time_cold, load_input_bytes};
+use common::aoc::{print_result, run_many, print_time_cold};
 use common::parsers::{parse_u32s_amount, parse_u32s_until};
 
 const ROW_MASK: u32 = 0b1111100000000000000000000;
 const COL_MASK: u32 = 0b1000010000100001000010000;
 
 fn main() {
-    let (input, dur_load) = run_once(|| load_input_bytes("day04"));
+    let input = include_bytes!("../input/day04.txt");
 
-    print_time("Load", dur_load);
-
-    let (input, dur_p, dur_pc) = run_many(1000, || Bingo::parse(&input));
+    let (input, dur_p, dur_pc) = run_many(1000, || Bingo::parse(input));
     let (res_p1, dur_p1, dur_p1c) = run_many(1000, || part1(&input));
     let (res_p2, dur_p2, dur_p2c) = run_many(1000, || part2(&input));
 
@@ -104,7 +102,8 @@ fn part2(input: &Bingo) -> u32 {
         }
     }
 
-    0}
+    0
+}
 
 struct Bingo {
     numbers: Vec<u32>,

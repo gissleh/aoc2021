@@ -50,6 +50,12 @@ impl<T> FixedGrid<T>
     pub fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut T> {
         self.data.get_mut(y * self.width + x)
     }
+    pub fn get_slice_mut(&mut self, x1: usize, x2: usize, y: usize) -> &mut [T] {
+        let left = y * self.width + x1;
+        let right = left + (x2 - x1);
+
+        &mut self.data.as_mut_slice()[left..right]
+    }
     pub unsafe fn get_unchecked_mut(&mut self, x: usize, y: usize) -> &mut T {
         self.data.get_unchecked_mut(y * self.width + x)
     }
