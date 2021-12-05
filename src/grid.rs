@@ -108,6 +108,26 @@ impl<T> FixedGrid<T>
 }
 
 impl<T> FixedGrid<T>
+{
+    pub fn insert(&mut self, x: usize, y: usize, v: T) {
+        self.data[y * self.width + x] = v;
+    }
+}
+
+impl<T> FixedGrid<T>
+    where
+        T: Default + Clone,
+{
+    pub fn blank(width: usize, height: usize) -> FixedGrid<T> {
+        FixedGrid {
+            data: vec![T::default(); width * height],
+            width,
+            height,
+        }
+    }
+}
+
+impl<T> FixedGrid<T>
     where
         T: Clone + Copy,
 {
