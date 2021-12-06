@@ -1,14 +1,12 @@
-use common::aoc::{load_input, print_result, print_time, run_many, run_once, print_time_cold};
-use common::parsers::{parse_u32};
+use common::aoc::{print_result, run_many, print_time_cold};
+use common::parsers::{parse_u32_list};
 
 fn main() {
-    let (input, dur_load) = run_once(|| load_input("dayXX"));
+    let input = include_bytes!("../input/dayXX.txt");
 
-    print_time("Load", dur_load);
-
-    let (input, dur_p, dur_pc) = run_many(1000, || parse_input(&input));
-    let (res_p1, dur_p1, dur_p1c) = run_many(100000, || part1(&input));
-    let (res_p2, dur_p2, dur_p2c) = run_many(100000, || part2(&input));
+    let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input));
+    let (res_p1, dur_p1, dur_p1c) = run_many(1000, || part1(&input));
+    let (res_p2, dur_p2, dur_p2c) = run_many(1000, || part2(&input));
 
     print_result("P1", res_p1);
     print_result("P2", res_p2);
@@ -27,6 +25,6 @@ fn part2(input: &[u32]) -> u32 {
     0
 }
 
-fn parse_input(input: &str) -> Vec<u32> {
-    input.lines().map(parse_u32).collect()
+fn parse_input(input: &[u8]) -> Vec<u32> {
+    parse_u32_list(input)
 }
