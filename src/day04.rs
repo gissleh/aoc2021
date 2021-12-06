@@ -183,14 +183,14 @@ mod tests {
 
     #[test]
     fn test_part1() {
-        let mut bingo = Bingo::parse(SAMPLE_INPUT.as_bytes());
+        let bingo = Bingo::parse(SAMPLE_INPUT.as_bytes());
 
         assert_eq!(part1(&bingo), 4512);
     }
 
     #[test]
     fn test_part2() {
-        let mut bingo = Bingo::parse(SAMPLE_INPUT.as_bytes());
+        let bingo = Bingo::parse(SAMPLE_INPUT.as_bytes());
 
         assert_eq!(part2(&bingo), 1924);
     }
