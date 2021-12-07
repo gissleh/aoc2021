@@ -38,6 +38,8 @@ fn puzzle(input: &[u32], fuel_cb: impl Fn(u32) -> u32) -> u32 {
 
         if fuel < winning_fuel {
             winning_fuel = fuel;
+        } else {
+            break;
         }
     }
 
