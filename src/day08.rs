@@ -67,52 +67,33 @@ fn part2(input: &[u8]) -> u32 {
             }
         }
 
-        // Find 9 (not eight, but has both 4 and 7)
+        // Find the rest using these four numbers
         let almost_nine = found_numbers[4] | found_numbers[7];
         for n in line.iter() {
             if *n == SEPARATOR {
                 break;
             }
 
-            if *n != found_numbers[8] && (*n & almost_nine) == almost_nine {
-                found_numbers[9] = *n;
-                break;
-            }
-        }
-
-        // Find 0 and 6 since we have 9
-        for n in line.iter() {
-            if *n == SEPARATOR {
-                break;
-            }
-
-            if n.count_ones() != 6 || found_numbers[9] == *n {
-                continue
-            }
-
-            if *n & found_numbers[7] == found_numbers[7] {
-                found_numbers[0] = *n;
-            } else {
-                found_numbers[6] = *n;
-            }
-        }
-
-        // Find 2, 3 and 5 using 7 and 6
-        for n in line.iter() {
-            if *n == SEPARATOR {
-                break;
-            }
-
-            if n.count_ones() != 5 {
-                continue
-            }
-
-            if *n & found_numbers[7] == found_numbers[7] {
-                found_numbers[3] = *n;
-            } else if *n & found_numbers[6] == *n {
-                found_numbers[5] = *n;
-            } else {
-                found_numbers[2] = *n;
+            match n.count_ones() {
+                6 => {
+                    if *n != found_numbers[8] && (*n & almost_nine) == almost_nine {
+                        found_numbers[9] = *n;
+                    } else if *n & found_numbers[7] == found_numbers[7] {
+                        found_numbers[0] = *n;
+                    } else {
+                        found_numbers[6] = *n;
+                    }
+                }
+                5 => {
+                    if *n & found_numbers[1] == found_numbers[1] {
+                        found_numbers[3] = *n;
+                    } else if (*n & found_numbers[4]).count_ones() == 3 {
+                        found_numbers[5] = *n;
+                    } else {
+                        found_numbers[2] = *n;
+                    }
+                }
+                _ => {}
             }
         }
 
