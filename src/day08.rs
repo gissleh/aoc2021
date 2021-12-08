@@ -51,6 +51,7 @@ fn part2(input: &[u8]) -> u32 {
         }
 
         let mut found_numbers = [0u8; 10];
+        let mut rev_map = [0u32; 255];
 
         // Find 1,7,4,8 (the easy ones)
         for n in line.iter() {
@@ -59,11 +60,23 @@ fn part2(input: &[u8]) -> u32 {
             }
 
             match n.count_ones() {
-                2 => found_numbers[1] = *n,
-                3 => found_numbers[7] = *n,
-                4 => found_numbers[4] = *n,
-                7 => found_numbers[8] = *n,
-                _ => {},
+                2 => {
+                    found_numbers[1] = *n;
+                    rev_map[*n as usize] = 1;
+                }
+                3 => {
+                    found_numbers[7] = *n;
+                    rev_map[*n as usize] = 7;
+                }
+                4 => {
+                    found_numbers[4] = *n;
+                    rev_map[*n as usize] = 4;
+                }
+                7 => {
+                    found_numbers[8] = *n;
+                    rev_map[*n as usize] = 8;
+                }
+                _ => {}
             }
         }
 
@@ -78,19 +91,24 @@ fn part2(input: &[u8]) -> u32 {
                 6 => {
                     if *n != found_numbers[8] && (*n & almost_nine) == almost_nine {
                         found_numbers[9] = *n;
+                        rev_map[*n as usize] = 9;
                     } else if *n & found_numbers[7] == found_numbers[7] {
                         found_numbers[0] = *n;
                     } else {
                         found_numbers[6] = *n;
+                        rev_map[*n as usize] = 6;
                     }
                 }
                 5 => {
                     if *n & found_numbers[1] == found_numbers[1] {
                         found_numbers[3] = *n;
+                        rev_map[*n as usize] = 3;
                     } else if (*n & found_numbers[4]).count_ones() == 3 {
                         found_numbers[5] = *n;
+                        rev_map[*n as usize] = 5;
                     } else {
                         found_numbers[2] = *n;
+                        rev_map[*n as usize] = 2;
                     }
                 }
                 _ => {}
@@ -100,17 +118,7 @@ fn part2(input: &[u8]) -> u32 {
         let mut number = 0;
         for v in line.iter().skip_while(|v| **v != SEPARATOR).skip(1) {
             number *= 10;
-
-            for (i, d) in found_numbers.iter().enumerate() {
-                if *d == *v {
-                    number += i as u32;
-                    break;
-                }
-
-                if i == 9 {
-                    panic!("{:?} {:?}", line, found_numbers);
-                }
-            }
+            number += rev_map[*v as usize];
         }
 
         sum += number;
