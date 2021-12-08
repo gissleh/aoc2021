@@ -44,81 +44,32 @@ fn part1(input: &[u8]) -> u32 {
 
 fn part2(input: &[u8]) -> u32 {
     let mut sum = 0;
+    let number_start = 1 + input.iter().enumerate().find(|(_, v)| **v == SEPARATOR).map(|(i, _)| i).unwrap();
 
     for line in input.split(|b| *b == NEWLINE) {
         if line.is_empty() {
             continue;
         }
 
-        let mut found_numbers = [0u8; 10];
-        let mut rev_map = [0u32; 255];
-
-        // Find 1,7,4,8 (the easy ones)
-        for n in line.iter() {
-            if *n == SEPARATOR {
-                break;
-            }
-
-            match n.count_ones() {
-                2 => {
-                    found_numbers[1] = *n;
-                    rev_map[*n as usize] = 1;
-                }
-                3 => {
-                    found_numbers[7] = *n;
-                    rev_map[*n as usize] = 7;
-                }
-                4 => {
-                    found_numbers[4] = *n;
-                    rev_map[*n as usize] = 4;
-                }
-                7 => {
-                    found_numbers[8] = *n;
-                    rev_map[*n as usize] = 8;
-                }
-                _ => {}
-            }
-        }
-
-        // Find the rest using these four numbers
-        let almost_nine = found_numbers[4] | found_numbers[7];
-        for n in line.iter() {
-            if *n == SEPARATOR {
-                break;
-            }
-
-            match n.count_ones() {
-                6 => {
-                    if *n != found_numbers[8] && (*n & almost_nine) == almost_nine {
-                        found_numbers[9] = *n;
-                        rev_map[*n as usize] = 9;
-                    } else if *n & found_numbers[7] == found_numbers[7] {
-                        found_numbers[0] = *n;
-                    } else {
-                        found_numbers[6] = *n;
-                        rev_map[*n as usize] = 6;
-                    }
-                }
-                5 => {
-                    if *n & found_numbers[1] == found_numbers[1] {
-                        found_numbers[3] = *n;
-                        rev_map[*n as usize] = 3;
-                    } else if (*n & found_numbers[4]).count_ones() == 3 {
-                        found_numbers[5] = *n;
-                        rev_map[*n as usize] = 5;
-                    } else {
-                        found_numbers[2] = *n;
-                        rev_map[*n as usize] = 2;
-                    }
-                }
-                _ => {}
-            }
-        }
+        let one = *line.iter().find(|v| v.count_ones() == 2).unwrap();
+        let four = *line.iter().find(|v| v.count_ones() == 4).unwrap();
 
         let mut number = 0;
-        for v in line.iter().skip_while(|v| **v != SEPARATOR).skip(1) {
+        for n in line[number_start..].iter() {
             number *= 10;
-            number += rev_map[*v as usize];
+            number += match n.count_ones() {
+                2 => 1,
+                3 => 7,
+                4 => 4,
+                5 if *n & one == one => 3,
+                5 if (*n & four).count_ones() == 3 => 5,
+                5 => 2,
+                6 if *n & four == four => 9,
+                6 if *n & one == one => 0,
+                6 => 6,
+                7 => 8,
+                _ => unreachable!(),
+            }
         }
 
         sum += number;
