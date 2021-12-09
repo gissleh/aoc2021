@@ -166,6 +166,12 @@ impl<T> FixedGrid<T>
         self.data[index..index + src.len()].copy_from_slice(src);
     }
 
+    pub fn copy_from(&mut self, other: &FixedGrid<T>) {
+        assert_eq!(self.width, other.width);
+        assert_eq!(self.height, other.height);
+        self.data.copy_from_slice(&other.data);
+    }
+
     pub fn new(width: usize, height: usize, def: T) -> FixedGrid<T> {
         FixedGrid {
             data: vec![def; width * height],
@@ -256,8 +262,8 @@ impl FixedGrid<char>
 }
 
 const OFFSETS: [(usize, usize); 4] = [
-    (!0, 0),
     (0, !0),
+    (!0, 0),
     (1, 0),
     (0, 1),
 ];
@@ -273,6 +279,7 @@ const OFFSETS_DIAGONAL: [(usize, usize); 8] = [
     (1, 1),
 ];
 
+#[derive(Debug)]
 pub enum BFSStep<U> {
     Continue(U),
     Found(U),
@@ -280,6 +287,7 @@ pub enum BFSStep<U> {
 }
 
 /// BFS struct is to keep some state between runs to avoid needless allocations.
+#[derive(Clone)]
 pub struct BFS<S> {
     visited: FixedGrid<bool>,
     queue: VecDeque<(usize, usize, usize, S)>,
@@ -293,7 +301,7 @@ impl<S> BFS<S> where S: Clone + Default {
     }
 
     /// Run BFS on this grid. This will reset all state, so is safe to call multiple times.
-    pub fn run<'a, T>(&'a mut self, grid: &'a FixedGrid<T>, start_x: usize, start_y: usize, diagonal: bool, check: impl Fn(&'a T, &S) -> BFSStep<S>) -> Option<(&'a T, usize, S)> {
+    pub fn run<'a, T>(&'a mut self, grid: &'a FixedGrid<T>, start_x: usize, start_y: usize, diagonal: bool, check: impl Fn(&'a T, (usize, usize), &S) -> BFSStep<S>) -> Option<(&'a T, usize, S)> {
         if self.visited.width < grid.width || self.visited.height < grid.height {
             self.visited = FixedGrid::blank(grid.width, grid.height);
         } else {
@@ -311,7 +319,7 @@ impl<S> BFS<S> where S: Clone + Default {
             self.visited.set(x, y, true);
             let v = grid.get(x, y).unwrap();
 
-            match check(v, &state) {
+            match check(v, (x, y), &state) {
                 BFSStep::Continue(new_state) => {
                     for (x_offset, y_offset) in offsets.iter() {
                         let x2 = x.wrapping_add(*x_offset);
@@ -399,7 +407,7 @@ pub mod tests {
         assert_eq!(s, 2);
     }
 
-    fn checker_without_state(v: &u8, _: &()) -> BFSStep<()> {
+    fn checker_without_state(v: &u8, _: (usize, usize), _: &()) -> BFSStep<()> {
         match *v {
             b'#' => BFSStep::DeadEnd,
             b'y' => BFSStep::Found(()),
@@ -407,7 +415,7 @@ pub mod tests {
         }
     }
 
-    fn checker_with_state(v: &u8, s: &u32) -> BFSStep<u32> {
+    fn checker_with_state(v: &u8, _: (usize, usize), s: &u32) -> BFSStep<u32> {
         match *v {
             b'#' => BFSStep::DeadEnd,
             b'x' => BFSStep::Continue(*s + 1),

@@ -152,7 +152,7 @@ fn part2(maze: &FixedGrid<u8>) -> usize {
 fn search(maze: &FixedGrid<u8>, from_x: usize, from_y: usize, target: u8) -> (usize, u32, (usize, usize)) {
     let mut bfs = BFS::<u32>::new();
 
-    if let Some((_, len, door_mask)) = bfs.run(&maze, from_x, from_y, false, |curr, door_mask| {
+    if let Some((_, len, door_mask)) = bfs.run(&maze, from_x, from_y, false, |curr, _, door_mask| {
         if *curr == target {
             BFSStep::Found(*door_mask)
         } else {

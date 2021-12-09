@@ -42,6 +42,14 @@ pub fn run_once<T>(callback: impl Fn() -> T) -> (T, i64) {
     (result, start.to(end).num_nanoseconds().unwrap())
 }
 
+pub fn run_once_mut<T>(mut callback: impl FnMut() -> T) -> (T, i64) {
+    let start = PreciseTime::now();
+    let result = callback();
+    let end = PreciseTime::now();
+
+    (result, start.to(end).num_nanoseconds().unwrap())
+}
+
 pub fn run_many<T>(times: usize, callback: impl Fn() -> T) -> (T, i64, i64) {
     let cold_start = PreciseTime::now();
     let mut result = callback();
@@ -60,10 +68,13 @@ pub fn run_many<T>(times: usize, callback: impl Fn() -> T) -> (T, i64, i64) {
     )
 }
 
-pub fn run_many_mut<T>(times: usize, mut callback: impl FnMut() -> T) -> (T, i64) {
-    let start = PreciseTime::now();
+pub fn run_many_mut<T>(times: usize, mut callback: impl FnMut() -> T) -> (T, i64, i64) {
+    let cold_start = PreciseTime::now();
     let mut result = callback();
-    for _ in 1..times {
+    let cold_end = PreciseTime::now();
+
+    let start = PreciseTime::now();
+    for _ in 0..times {
         result = callback();
     }
     let end = PreciseTime::now();
@@ -71,6 +82,7 @@ pub fn run_many_mut<T>(times: usize, mut callback: impl FnMut() -> T) -> (T, i64
     (
         result,
         start.to(end).num_nanoseconds().unwrap() / times as i64,
+        cold_start.to(cold_end).num_nanoseconds().unwrap() as i64,
     )
 }
 
