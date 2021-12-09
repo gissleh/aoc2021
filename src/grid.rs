@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 #[derive(Clone)]
 pub struct GridSet<T> {
     chunk_width: isize,
@@ -43,6 +45,15 @@ impl<T> FixedGrid<T>
     }
     pub fn get(&self, x: usize, y: usize) -> Option<&T> {
         self.data.get(y * self.width + x)
+    }
+    pub fn get_safe(&self, x: usize, y: usize) -> Option<&T> {
+        if x >= self.width {
+            None
+        } else if y >= self.height {
+            None
+        } else {
+            self.data.get(y * self.width + x)
+        }
     }
     pub unsafe fn get_unchecked(&self, x: usize, y: usize) -> &T {
         self.data.get_unchecked(y * self.width + x)
@@ -112,12 +123,23 @@ impl<T> FixedGrid<T>
     pub fn insert(&mut self, x: usize, y: usize, v: T) {
         self.data[y * self.width + x] = v;
     }
+    pub fn empty() -> FixedGrid<T> {
+        FixedGrid {
+            width: 0,
+            height: 0,
+            data: Vec::new(),
+        }
+    }
 }
 
 impl<T> FixedGrid<T>
     where
         T: Default + Clone,
 {
+    pub fn clear(&mut self) {
+        self.data.fill(T::default());
+    }
+
     pub fn blank(width: usize, height: usize) -> FixedGrid<T> {
         FixedGrid {
             data: vec![T::default(); width * height],
@@ -230,5 +252,167 @@ impl FixedGrid<char>
         let data = s.chars().filter(|c| *c != '\n' && *c != '\r').collect();
 
         FixedGrid::from(width, height, data)
+    }
+}
+
+const OFFSETS: [(usize, usize); 4] = [
+    (!0, 0),
+    (0, !0),
+    (1, 0),
+    (0, 1),
+];
+
+const OFFSETS_DIAGONAL: [(usize, usize); 8] = [
+    (!0, !0),
+    (!0, 0),
+    (!0, 1),
+    (0, !0),
+    (0, 1),
+    (1, !0),
+    (1, 0),
+    (1, 1),
+];
+
+pub enum BFSStep<U> {
+    Continue(U),
+    Found(U),
+    DeadEnd,
+}
+
+/// BFS struct is to keep some state between runs to avoid needless allocations.
+pub struct BFS<S> {
+    visited: FixedGrid<bool>,
+    queue: VecDeque<(usize, usize, usize, S)>,
+    found_pos: Option<(usize, usize)>,
+}
+
+impl<S> BFS<S> where S: Clone + Default {
+    /// Get the position where it was found in the last run.
+    pub fn found_pos(&self) -> Option<(usize, usize)> {
+        self.found_pos
+    }
+
+    /// Run BFS on this grid. This will reset all state, so is safe to call multiple times.
+    pub fn run<'a, T>(&'a mut self, grid: &'a FixedGrid<T>, start_x: usize, start_y: usize, diagonal: bool, check: impl Fn(&'a T, &S) -> BFSStep<S>) -> Option<(&'a T, usize, S)> {
+        if self.visited.width < grid.width || self.visited.height < grid.height {
+            self.visited = FixedGrid::blank(grid.width, grid.height);
+        } else {
+            self.visited.clear();
+        }
+
+        self.found_pos = None;
+
+        self.queue.clear();
+        self.queue.push_back((start_x, start_y, 0, S::default()));
+
+        let offsets: &[(usize, usize)] = if diagonal { &OFFSETS_DIAGONAL } else { &OFFSETS };
+
+        while let Some((x, y, l, state)) = self.queue.pop_front() {
+            self.visited.set(x, y, true);
+            let v = grid.get(x, y).unwrap();
+
+            match check(v, &state) {
+                BFSStep::Continue(new_state) => {
+                    for (x_offset, y_offset) in offsets.iter() {
+                        let x2 = x.wrapping_add(*x_offset);
+                        if x2 >= grid.width() {
+                            continue;
+                        }
+                        let y2 = y.wrapping_add(*y_offset);
+                        if y2 >= grid.height() {
+                            continue;
+                        }
+                        if *self.visited.get(x2, y2).unwrap() {
+                            continue;
+                        }
+
+                        self.queue.push_back((x2, y2, l + 1, new_state.clone()));
+                    }
+                }
+                BFSStep::Found(new_state) => {
+                    self.found_pos = Some((x, y));
+                    return Some((v, l, new_state));
+                }
+                BFSStep::DeadEnd => {
+                    // Do nothing.
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn new() -> BFS<S> {
+        BFS {
+            visited: FixedGrid::empty(),
+            queue: VecDeque::with_capacity(64),
+            found_pos: None,
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    const TEST_GRID: &str = "
+######################
+#y...............#xxx#
+#.#x##########.#.#x#x#
+#.#....x.......#.#.#x#
+#x###.#.###.##.#.#.#x#
+#.##..#.###.##.#...#x#
+#.#..##.###.########.#
+#.#.###..............#
+#x#.#................#
+#.#.#.###............#
+#.#.#.#...#.##.#######
+#.....#.###.##....####
+##...##.#...#..##....#
+######################
+";
+
+    #[test]
+    pub fn test_bfs_nostate() {
+        let mut bfs = BFS::<()>::new();
+        let grid = FixedGrid::<u8>::from_str(&TEST_GRID);
+
+        let res = bfs.run(&grid, 12, 8, false, checker_without_state);
+
+        assert!(res.is_some());
+        let (x, len, _) = res.unwrap();
+        assert_eq!(*x, b'y');
+        assert_eq!(len, 18);
+    }
+
+    #[test]
+    pub fn test_bfs_state() {
+        let mut bfs = BFS::<u32>::new();
+        let grid = FixedGrid::<u8>::from_str(&TEST_GRID);
+
+        let res = bfs.run(&grid, 12, 8, false, checker_with_state);
+
+        assert!(res.is_some());
+        let (x, len, s) = res.unwrap();
+        assert_eq!(*x, b'y');
+        assert_eq!(len, 18);
+        assert_eq!(s, 2);
+    }
+
+    fn checker_without_state(v: &u8, _: &()) -> BFSStep<()> {
+        match *v {
+            b'#' => BFSStep::DeadEnd,
+            b'y' => BFSStep::Found(()),
+            _ => BFSStep::Continue(()),
+        }
+    }
+
+    fn checker_with_state(v: &u8, s: &u32) -> BFSStep<u32> {
+        match *v {
+            b'#' => BFSStep::DeadEnd,
+            b'x' => BFSStep::Continue(*s + 1),
+            b'y' => BFSStep::Found(*s),
+            _ => BFSStep::Continue(*s),
+        }
     }
 }

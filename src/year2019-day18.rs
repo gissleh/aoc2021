@@ -1,15 +1,6 @@
 use common::aoc::{print_result, run_many, print_time_cold};
-use common::grid::FixedGrid;
+use common::grid::{FixedGrid, BFS, BFSStep};
 use rustc_hash::FxHashMap;
-
-const DIRS: [(usize, usize); 4] = [
-    (!0, 0),
-    (0, !0),
-    (1, 0),
-    (0, 1),
-];
-
-const RET_DIRS: [usize; 4] = [2, 3, 0, 1];
 
 const ALPHA: &[u8] = b"@abcdefghijklmnopqrstuvwxyz";
 
@@ -158,65 +149,34 @@ fn part2(maze: &FixedGrid<u8>) -> usize {
     shortest
 }
 
-fn dfs(maze: &FixedGrid<u8>, from_x: usize, from_y: usize, target: u8) -> (usize, u32, (usize, usize)) {
-    let mut stack: Vec<(usize, usize, usize, usize, usize, u32)> = Vec::with_capacity(200);
-    let mut has_searched = FixedGrid::new(maze.width(), maze.height(), 0);
-    let mut shortest = 0;
-    let mut shortest_dm = 0;
-    let mut shortest_pos = (0, 0);
-    stack.push((from_x, from_y, 0, 0, 4, 0));
+fn search(maze: &FixedGrid<u8>, from_x: usize, from_y: usize, target: u8) -> (usize, u32, (usize, usize)) {
+    let mut bfs = BFS::<u32>::new();
 
-    while let Some((x, y, pos, dir, ret_dir, door_mask)) = stack.pop() {
-        has_searched.set(x, y, pos);
-        if shortest > 0 && pos > shortest {
-            continue;
-        }
-
-        for d in dir..DIRS.len() {
-            if d == ret_dir {
-                continue;
-            }
-
-            let (dx, dy) = DIRS[d];
-            let x2 = x.wrapping_add(dx);
-            let y2 = y.wrapping_add(dy);
-            let v = maze.get(x2, y2).unwrap();
-
-            if *v == target {
-                if shortest == 0 || shortest > pos + 1 {
-                    shortest = pos + 1;
-                    shortest_dm = door_mask;
-                    shortest_pos = (x2, y2);
-                }
-
-                continue;
-            }
-
-            let hs_len = *has_searched.get(x2, y2).unwrap();
-            if hs_len > 0 && (pos + 1) >= hs_len {
-                continue;
-            }
-
-            match *v {
+    if let Some((_, len, door_mask)) = bfs.run(&maze, from_x, from_y, false, |curr, door_mask| {
+        if *curr == target {
+            BFSStep::Found(*door_mask)
+        } else {
+            match *curr {
                 b'A'..=b'Z' => {
-                    let new_door_mask = door_mask | (1 << ((*v - b'A') + 1) as u32);
-                    stack.push((x, y, pos, d + 1, ret_dir, door_mask));
-                    stack.push((x2, y2, pos + 1, 0, RET_DIRS[d], new_door_mask));
+                    let new_door_mask = *door_mask | (1 << ((*curr - b'A') + 1) as u32);
+                    BFSStep::Continue(new_door_mask)
                 }
                 b'a'..=b'z' => {
-                    stack.push((x, y, pos, d + 1, ret_dir, door_mask));
-                    stack.push((x2, y2, pos + 1, 0, RET_DIRS[d], door_mask));
+                    BFSStep::Continue(*door_mask)
                 }
                 b'.' | b'@' => {
-                    stack.push((x, y, pos, d + 1, ret_dir, door_mask));
-                    stack.push((x2, y2, pos + 1, 0, RET_DIRS[d], door_mask));
+                    BFSStep::Continue(*door_mask)
                 }
-                _ => {}
+                _ => {
+                    BFSStep::DeadEnd
+                }
             }
         }
+    }) {
+        (len, door_mask, bfs.found_pos().unwrap())
+    } else {
+        (0, 0, (0, 0))
     }
-
-    (shortest, shortest_dm, shortest_pos)
 }
 
 struct MazeTree {
@@ -255,7 +215,7 @@ impl MazeTree {
 
         for i in 0..keys.len() {
             for j in (i + 1)..keys.len() {
-                let (dist, doors, (x, y)) = dfs(&maze, keys[j].x, keys[j].y, ALPHA[i]);
+                let (dist, doors, (x, y)) = search(&maze, keys[j].x, keys[j].y, ALPHA[i]);
                 if dist == 0 {
                     continue;
                 }
@@ -347,11 +307,11 @@ mod tests {
 #############";
 
     #[test]
-    fn test_dfs() {
+    fn test_search() {
         let maze = FixedGrid::<u8>::from_str(SAMPLE_1A);
 
-        let (sb_len, sb_doors, _) = dfs(&maze, 5, 1, b'b');
-        let (sa_len, sa_doors, _) = dfs(&maze, 5, 1, b'a');
+        let (sb_len, sb_doors, _) = search(&maze, 5, 1, b'b');
+        let (sa_len, sa_doors, _) = search(&maze, 5, 1, b'a');
 
         assert_eq!(sb_doors, 2);
         assert_eq!(sb_len, 4);
