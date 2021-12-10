@@ -17,11 +17,10 @@ fn main() {
     let input = include_bytes!("../input/year2018-day15.txt");
 
     let (mut board, dur_p, dur_pc) = run_many(1000, || Board::parse(input));
-    let (res_p1, dur_p1) = run_once_mut(|| part1(&mut board));
     let (res_p2, dur_p2) = run_once_mut(|| part2(&mut board));
-
-    print_result("P1", res_p1);
     print_result("P2", res_p2);
+    let (res_p1, dur_p1) = run_once_mut(|| part1(&mut board));
+    print_result("P1", res_p1);
 
     print_time_cold("Parse", dur_p, dur_pc);
     print_time("P1", dur_p1);
@@ -32,7 +31,7 @@ fn main() {
 fn part1(board: &mut Board) -> u32 {
     board.reset();
 
-    for n in 1..3 {
+    for n in 0.. {
         if board.run_turn(3) {
             return n * board.total_hp();
         }
@@ -45,21 +44,21 @@ fn part2(board: &mut Board) -> u32 {
     for a in 4.. {
         board.reset();
 
-        for n in 1.. {
-            println!("Round {}", n);
+        println!("initial_state");
+        board.print();
 
+        for n in 0.. {
             let done = board.run_turn(a);
+
+            let full_rounds = if done { n } else { n + 1 };
+            println!("full_rounds={} total_hp={} elfpower={} elves={} goblins={}", full_rounds, board.total_hp() ,a, board.remaining_elves, board.remaining_goblins);
+            board.print();
 
             if board.elf_died {
                 break;
             }
 
-            board.print();
-
             if done {
-                board.print();
-                println!("{} {}", n, board.total_hp());
-
                 return n * board.total_hp();
             }
         }
@@ -84,15 +83,21 @@ impl Default for Piece {
 #[derive(Clone)]
 struct Board {
     initial_grid: FixedGrid<Piece>,
+    initial_elves: u32,
+    initial_goblins: u32,
     grid: FixedGrid<Piece>,
     bfs: BFS<(usize, usize)>,
     elf_died: bool,
+    remaining_elves: u32,
+    remaining_goblins: u32,
 }
 
 impl Board {
     fn reset(&mut self) {
         self.grid.copy_from(&self.initial_grid);
         self.elf_died = false;
+        self.remaining_elves = self.initial_elves;
+        self.remaining_goblins = self.initial_goblins;
     }
 
     #[allow(dead_code)]
@@ -122,7 +127,6 @@ impl Board {
         }
 
         println!();
-        println!();
     }
 
     fn total_hp(&self) -> u32 {
@@ -141,7 +145,7 @@ impl Board {
 
         for y in 0..self.grid.height() {
             for x in 0..self.grid.width() {
-                if let Some(Piece::Player(team, idx, health)) = self.grid.get(x, y).cloned() {
+                if let Some(Piece::Player(team, idx, _)) = self.grid.get(x, y).cloned() {
                     if has_moved[idx as usize] {
                         continue;
                     }
@@ -149,6 +153,10 @@ impl Board {
 
                     let other_team = if team == b'E' { b'G' } else { b'E' };
                     let attack_power = if team == b'E' { elf_attack_power } else { 3 };
+                    let has_target = if team == b'E' { self.remaining_goblins > 0 } else { self.remaining_elves > 0 };
+                    if !has_target {
+                        return true;
+                    }
 
                     // Pre-attack
                     if self.try_attacking(x, y, other_team, attack_power) {
@@ -163,20 +171,7 @@ impl Board {
             }
         }
 
-        let mut goblins = 0;
-        let mut elves = 0;
-        for (_, _, piece) in self.grid.iter() {
-            if let Piece::Player(team, _, _) = *piece {
-                if team == b'G' {
-                    goblins += 1;
-                } else {
-                    elves += 1;
-                }
-            }
-        }
-
-        println!("{} {}", goblins, elves);
-        goblins == 0 || elves == 0
+        false
     }
 
     fn try_attacking(&mut self, x: usize, y: usize, other_team: u8, attack_power: u32) -> bool {
@@ -186,6 +181,9 @@ impl Board {
             } else {
                 if other_team == b'E' {
                     self.elf_died = true;
+                    self.remaining_elves -= 1;
+                } else {
+                    self.remaining_goblins -= 1;
                 }
 
                 self.grid.set(x2, y2, Piece::Empty);
@@ -273,11 +271,27 @@ impl Board {
         }).collect();
         let height = data.len() / width;
 
+        let mut elves = 0;
+        let mut goblins = 0;
+        for piece in data.iter() {
+            if let Piece::Player(team, _, _) = piece {
+                if *team == b'E' {
+                    elves += 1;
+                } else {
+                    goblins += 1;
+                }
+            }
+        }
+
         Board {
             initial_grid: FixedGrid::from(width, height, data),
             grid: FixedGrid::blank(width, height),
             bfs: BFS::new(),
             elf_died: false,
+            initial_goblins: goblins,
+            initial_elves: elves,
+            remaining_elves: 0,
+            remaining_goblins: 0,
         }
     }
 }
@@ -308,6 +322,40 @@ mod tests {
 #.....G.#
 #########";
 
+    const SAMPLE3: &[u8] = b"#######
+#E..EG#
+#.#G.E#
+#E.##E#
+#G..#.#
+#..E#.#
+#######";
+
+    const SAMPLE4: &[u8] = b"#######
+#.E...#
+#.#..G#
+#.###.#
+#E#G#G#
+#...#G#
+#######";
+
+    const SAMPLE5: &[u8] = b"#######
+#E.G#.#
+#.#G..#
+#G.#.G#
+#G..#.#
+#...E.#
+#######";
+
+    const MOVEMENT_SAMPLE: &[u8] = b"#########
+#G..G..G#
+#.......#
+#.......#
+#G..E..G#
+#.......#
+#.......#
+#G..G..G#
+#########";
+
     #[test]
     fn test_part1() {
         let mut board = Board::parse(SAMPLE1);
@@ -320,8 +368,16 @@ mod tests {
     fn test_part2() {
         let mut board = Board::parse(SAMPLE1);
         let mut board2 = Board::parse(SAMPLE2);
+        let mut board3 = Board::parse(SAMPLE3);
+        let mut board4 = Board::parse(SAMPLE4);
+        let mut board5 = Board::parse(SAMPLE5);
+        let mut board6 = Board::parse(MOVEMENT_SAMPLE);
 
-        assert_eq!(part2(&mut board2), 1140);
         assert_eq!(part2(&mut board), 4988);
+        assert_eq!(part2(&mut board2), 1140);
+        assert_eq!(part2(&mut board3), 31284);
+        assert_eq!(part2(&mut board4), 6474);
+        assert_eq!(part2(&mut board5), 3478);
+        assert_eq!(part2(&mut board6), 1328);
     }
 }
