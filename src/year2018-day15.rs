@@ -1,5 +1,6 @@
 use std::thread::sleep;
 use std::time::Duration;
+use time::PreciseTime;
 use common::aoc::{print_result, run_many, print_time_cold, run_many_mut, run_once, print_time, run_once_mut};
 use common::grid::{BFS, BFSStep, FixedGrid};
 use common::parsers::{parse_u32_list};
@@ -31,13 +32,8 @@ fn main() {
 fn part1(board: &mut Board) -> u32 {
     board.reset();
 
-    for n in 1.. {
-        println!("Round {}", n);
-        board.print();
-        if board.run_turn() {
-            println!("Round {}", n+1);
-            board.print();
-            println!("{} {}", n, board.total_hp());
+    for n in 1..3 {
+        if board.run_turn(3) {
             return n * board.total_hp();
         }
     }
@@ -46,6 +42,29 @@ fn part1(board: &mut Board) -> u32 {
 }
 
 fn part2(board: &mut Board) -> u32 {
+    for a in 4.. {
+        board.reset();
+
+        for n in 1.. {
+            println!("Round {}", n);
+
+            let done = board.run_turn(a);
+
+            if board.elf_died {
+                break;
+            }
+
+            board.print();
+
+            if done {
+                board.print();
+                println!("{} {}", n, board.total_hp());
+
+                return n * board.total_hp();
+            }
+        }
+    }
+
     0
 }
 
@@ -67,11 +86,13 @@ struct Board {
     initial_grid: FixedGrid<Piece>,
     grid: FixedGrid<Piece>,
     bfs: BFS<(usize, usize)>,
+    elf_died: bool,
 }
 
 impl Board {
     fn reset(&mut self) {
         self.grid.copy_from(&self.initial_grid);
+        self.elf_died = false;
     }
 
     #[allow(dead_code)]
@@ -115,9 +136,8 @@ impl Board {
         total
     }
 
-    fn run_turn(&mut self) -> bool {
+    fn run_turn(&mut self, elf_attack_power: u32) -> bool {
         let mut has_moved = [false; 255];
-        let mut locked_up = [false; 255];
 
         for y in 0..self.grid.height() {
             for x in 0..self.grid.width() {
@@ -128,21 +148,16 @@ impl Board {
                     has_moved[idx as usize] = true;
 
                     let other_team = if team == b'E' { b'G' } else { b'E' };
+                    let attack_power = if team == b'E' { elf_attack_power } else { 3 };
 
                     // Pre-attack
-                    if self.try_attacking(x, y, other_team) {
-                        continue;
-                    }
-                    if locked_up[idx as usize] {
+                    if self.try_attacking(x, y, other_team, attack_power) {
                         continue;
                     }
 
                     // Make a move and attack if the path was short
                     if let Some((new_x, new_y)) = self.move_player(x, y, other_team) {
-                        self.try_attacking(new_x, new_y, other_team);
-                        locked_up = [false; 255];
-                    } else {
-                        locked_up[idx as usize] = true;
+                        self.try_attacking(new_x, new_y, other_team, attack_power);
                     }
                 }
             }
@@ -160,14 +175,19 @@ impl Board {
             }
         }
 
+        println!("{} {}", goblins, elves);
         goblins == 0 || elves == 0
     }
 
-    fn try_attacking(&mut self, x: usize, y: usize, other_team: u8) -> bool {
+    fn try_attacking(&mut self, x: usize, y: usize, other_team: u8, attack_power: u32) -> bool {
         if let Some((x2, y2, Piece::Player(_, idx, hp2))) = self.find_neighbor(x, y, other_team) {
-            if hp2 > 3 {
-                self.grid.set(x2, y2, Piece::Player(other_team, idx, hp2 - 3))
+            if hp2 > attack_power {
+                self.grid.set(x2, y2, Piece::Player(other_team, idx, hp2 - attack_power))
             } else {
+                if other_team == b'E' {
+                    self.elf_died = true;
+                }
+
                 self.grid.set(x2, y2, Piece::Empty);
             }
 
@@ -257,6 +277,7 @@ impl Board {
             initial_grid: FixedGrid::from(width, height, data),
             grid: FixedGrid::blank(width, height),
             bfs: BFS::new(),
+            elf_died: false,
         }
     }
 }
@@ -277,10 +298,30 @@ mod tests {
 #.....#
 #######";
 
+    const SAMPLE2: &[u8] = b"#########
+#G......#
+#.E.#...#
+#..##..G#
+#...##..#
+#...#...#
+#.G...G.#
+#.....G.#
+#########";
+
     #[test]
     fn test_part1() {
         let mut board = Board::parse(SAMPLE1);
 
         assert_eq!(part1(&mut board), 27730);
+    }
+
+
+    #[test]
+    fn test_part2() {
+        let mut board = Board::parse(SAMPLE1);
+        let mut board2 = Board::parse(SAMPLE2);
+
+        assert_eq!(part2(&mut board2), 1140);
+        assert_eq!(part2(&mut board), 4988);
     }
 }
