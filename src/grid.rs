@@ -261,7 +261,44 @@ impl FixedGrid<char>
     }
 }
 
-const OFFSETS: [(usize, usize); 4] = [
+#[derive(Copy, Clone)]
+pub struct TinyGrid<T, const W: usize, const S: usize> {
+    data: [T; S],
+}
+
+impl<T, const W: usize, const S: usize> TinyGrid<T, W, S>  {
+    pub fn get(&self, x: usize, y: usize) -> Option<&T> {
+        if x < W {
+            self.data.get(y * W + x)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut T> {
+        if x < W {
+            self.data.get_mut(y * W + x)
+        } else {
+            None
+        }
+    }
+
+    pub const fn new(data: [T; S]) -> TinyGrid<T, W, S> {
+        TinyGrid{ data }
+    }
+}
+
+impl<T, const W: usize, const S: usize> TinyGrid<T, W, S> where T: Copy {
+    pub fn set(&mut self, x: usize, y: usize, v: T) {
+        if x >= W {
+            panic!("Set out of bounds")
+        }
+
+        *self.data.get_mut((y * W) + x).unwrap() = v;
+    }
+}
+
+const OFFSETS_CARDINAL: [(usize, usize); 4] = [
     (0, !0),
     (!0, 0),
     (1, 0),
@@ -313,7 +350,7 @@ impl<S> BFS<S> where S: Clone + Default {
         self.queue.clear();
         self.queue.push_back((start_x, start_y, 0, S::default()));
 
-        let offsets: &[(usize, usize)] = if diagonal { &OFFSETS_DIAGONAL } else { &OFFSETS };
+        let offsets: &[(usize, usize)] = if diagonal { &OFFSETS_DIAGONAL } else { &OFFSETS_CARDINAL };
 
         while let Some((x, y, l, state)) = self.queue.pop_front() {
             self.visited.set(x, y, true);
@@ -357,6 +394,15 @@ impl<S> BFS<S> where S: Clone + Default {
             found_pos: None,
         }
     }
+}
+
+pub fn valid_offsets(diagonal: bool, x: usize, y: usize, w: usize, h: usize) -> impl Iterator<Item=(usize, usize)> {
+    let offsets = if diagonal { OFFSETS_DIAGONAL.as_slice() } else { OFFSETS_CARDINAL.as_slice() };
+
+    offsets.iter().map(move |(xo, yo)| (
+        x.wrapping_add(*xo),
+        y.wrapping_add(*yo),
+    )).filter(move |(x, y)| *x < w && *y < h)
 }
 
 #[cfg(test)]
