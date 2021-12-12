@@ -25,7 +25,6 @@ struct Map<'a> {
 
 struct Cave<'a> {
     name: &'a str,
-    index: usize,
     kind: CaveKind,
     exits: SmallVec<[usize; 8]>,
 }
@@ -67,7 +66,6 @@ impl<'a> Cave<'a> {
                     _ => unreachable!(),
                 }
             },
-            index: 0,
         }
     }
 }
@@ -130,12 +128,10 @@ impl<'a> Map<'a> {
                 if left_index == !0 {
                     left_index = caves.len();
                     caves.push(Cave::parse(left));
-                    caves[left_index].index = left_index;
                 }
                 if right_index == !0 {
                     right_index = caves.len();
                     caves.push(Cave::parse(right));
-                    caves[right_index].index = right_index;
                 }
 
                 caves[left_index].exits.push(right_index);
