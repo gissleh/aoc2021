@@ -1,4 +1,4 @@
-use smallvec::{SmallVec, smallvec};
+use smallvec::SmallVec;
 use common::aoc::{print_result, run_many, print_time_cold};
 
 fn main() {
@@ -40,17 +40,13 @@ enum CaveKind {
 struct Search {
     index: usize,
     single: bool,
-    path: SmallVec<[usize; 16]>,
-    mask: u64,
+    mask: u32,
 }
 
 impl Search {
     fn next(&self, index: usize, single: bool) -> Search {
-        let mut path = self.path.clone();
-        path.push(index);
-
         Search{
-            path, index,
+            index,
             single: single || self.single,
             mask: self.mask | (1 << index),
         }
@@ -79,15 +75,14 @@ impl<'a> Cave<'a> {
 impl<'a> Map<'a> {
     fn count_paths(&self, single_twice: bool) -> usize {
         let mut count = 0;
-        let mut queue = Vec::with_capacity(64);
-        queue.push(Search {
+        let mut stack = Vec::with_capacity(64);
+        stack.push(Search {
             index: self.start_index,
             mask: 1 << self.start_index,
-            path: smallvec![self.start_index],
             single: false,
         });
 
-        while let Some(current) = queue.pop() {
+        while let Some(current) = stack.pop() {
             let cave = &self.caves[current.index];
 
             for exit_index in cave.exits.iter() {
@@ -95,16 +90,16 @@ impl<'a> Map<'a> {
                 match exit.kind {
                     CaveKind::Start => {}
                     CaveKind::Big => {
-                        queue.push(current.next(*exit_index, false));
+                        stack.push(current.next(*exit_index, false));
                     }
                     CaveKind::End => {
                         count += 1;
                     }
                     CaveKind::Small => {
                         if (1 << exit_index) & current.mask == 0 {
-                            queue.push(current.next(*exit_index, false));
+                            stack.push(current.next(*exit_index, false));
                         } else if single_twice && !current.single {
-                            queue.push(current.next(*exit_index, true));
+                            stack.push(current.next(*exit_index, true));
                         }
                     }
                 }
@@ -153,5 +148,70 @@ impl<'a> Map<'a> {
         }
 
         Map { caves, start_index }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE_1: &str = "start-A
+start-b
+A-c
+A-b
+b-d
+A-end
+b-end";
+
+    const SAMPLE_2: &str = "dc-end
+HN-start
+start-kj
+dc-start
+dc-HN
+LN-dc
+HN-end
+kj-sa
+kj-HN
+kj-dc";
+
+    const SAMPLE_3: &str = "fs-end
+he-DX
+fs-he
+start-DX
+pj-DX
+end-zg
+zg-sl
+zg-pj
+pj-he
+RW-he
+fs-DX
+pj-RW
+zg-RW
+start-pj
+he-WI
+zg-he
+pj-fs
+start-RW";
+
+    #[test]
+    fn test_part1() {
+        let map_1 = Map::parse(SAMPLE_1);
+        let map_2 = Map::parse(SAMPLE_2);
+        let map_3 = Map::parse(SAMPLE_3);
+
+        assert_eq!(map_1.count_paths(false), 10);
+        assert_eq!(map_2.count_paths(false), 19);
+        assert_eq!(map_3.count_paths(false), 226);
+    }
+
+    #[test]
+    fn test_part2() {
+        let map_1 = Map::parse(SAMPLE_1);
+        let map_2 = Map::parse(SAMPLE_2);
+        let map_3 = Map::parse(SAMPLE_3);
+
+        assert_eq!(map_1.count_paths(true), 36);
+        assert_eq!(map_2.count_paths(true), 103);
+        assert_eq!(map_3.count_paths(true), 3509);
     }
 }
