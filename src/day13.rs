@@ -6,8 +6,8 @@ fn main() {
     let input = include_bytes!("../input/day13.txt");
 
     let ((points, folds), dur_p, dur_pc) = run_many(1000, || parse_input(input));
-    let (res_p1, dur_p1, dur_p1c) = run_many(1000, || part1(&points, &folds));
-    let (res_p2, dur_p2, dur_p2c) = run_many(1000, || part2(&points, &folds));
+    let (res_p1, dur_p1, dur_p1c) = run_many(100, || part1(&points, &folds));
+    let (res_p2, dur_p2, dur_p2c) = run_many(100, || part2(&points, &folds));
 
     print_result("P1", res_p1);
     println!("Result (P2):");
@@ -38,7 +38,7 @@ fn part2(points: &[(u32, u32)], folds: &[Fold]) -> FixedGrid<u8> {
 
     let mut grid = FixedGrid::new((max_x+1) as usize, (max_y+1) as usize, b' ');
     for (x, y) in points.iter() {
-        grid.set(*x as usize, *y as usize, b'#');
+        grid[(*x as usize, *y as usize)] = b'#';
     }
 
     grid
@@ -67,11 +67,10 @@ fn perform_folds(points: &[(u32, u32)], mut folds: &[Fold], fold_amount: Option<
                 }
             }
         }
-
-
-        points.sort_unstable();
-        points.dedup();
     }
+
+    points.sort_unstable();
+    points.dedup();
 
     points
 }

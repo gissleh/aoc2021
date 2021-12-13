@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::ops::{Index, IndexMut};
 
 #[derive(Clone)]
 pub struct GridSet<T> {
@@ -69,6 +70,12 @@ impl<T> FixedGrid<T>
     }
     pub unsafe fn get_unchecked_mut(&mut self, x: usize, y: usize) -> &mut T {
         self.data.get_unchecked_mut(y * self.width + x)
+    }
+    pub fn lines(&self) -> impl Iterator<Item=&[T]> {
+        self.data.chunks(self.width)
+    }
+    pub fn line(&self, y: usize) -> &[T] {
+        &self.data[(y * self.width)..((y + 1) * self.width)]
     }
     pub fn iter(&self) -> impl Iterator<Item=(usize, usize, &T)> {
         let mut y = 0usize;
@@ -206,10 +213,34 @@ impl<T> FixedGrid<T>
         count
     }
 
+    pub fn has(&self, x: usize, y: usize, v: T) -> bool {
+        if x >= self.width {
+            false
+        } else if y >= self.height {
+            false
+        } else {
+            self.data[(y * self.width) + x] == v
+        }
+    }
+
     pub fn find(&self, v: T) -> Option<(usize, usize)> {
         self.iter()
             .find(|(_, _, v2)| v == **v2)
             .map(|(x, y, _)| (x, y))
+    }
+}
+
+impl<T> Index<(usize, usize)> for FixedGrid<T> {
+    type Output = T;
+
+    fn index(&self, idx: (usize, usize)) -> &Self::Output {
+        self.get(idx.0, idx.1).unwrap()
+    }
+}
+
+impl<T> IndexMut<(usize, usize)> for FixedGrid<T> {
+    fn index_mut(&mut self, idx: (usize, usize)) -> &mut Self::Output {
+        self.get_mut(idx.0, idx.1).unwrap()
     }
 }
 
@@ -266,7 +297,7 @@ pub struct TinyGrid<T, const W: usize, const S: usize> {
     data: [T; S],
 }
 
-impl<T, const W: usize, const S: usize> TinyGrid<T, W, S>  {
+impl<T, const W: usize, const S: usize> TinyGrid<T, W, S> {
     pub fn get(&self, x: usize, y: usize) -> Option<&T> {
         if x < W {
             self.data.get(y * W + x)
@@ -284,7 +315,7 @@ impl<T, const W: usize, const S: usize> TinyGrid<T, W, S>  {
     }
 
     pub const fn new(data: [T; S]) -> TinyGrid<T, W, S> {
-        TinyGrid{ data }
+        TinyGrid { data }
     }
 }
 
@@ -317,17 +348,19 @@ const OFFSETS_DIAGONAL: [(usize, usize); 8] = [
 ];
 
 #[derive(Debug)]
-pub enum BFSStep<U> {
-    Continue(U),
-    Found(U),
+pub enum BFSStep<S> {
+    Continue(S),
+    Found(S),
+    Warp(usize, usize, S),
+    WarpLevel(usize, usize, isize, S),
     DeadEnd,
 }
 
 /// BFS struct is to keep some state between runs to avoid needless allocations.
 #[derive(Clone)]
 pub struct BFS<S> {
-    visited: FixedGrid<bool>,
-    queue: VecDeque<(usize, usize, usize, S)>,
+    visited: Vec<FixedGrid<bool>>,
+    queue: VecDeque<(usize, usize, usize, usize, S)>,
     found_pos: Option<(usize, usize)>,
 }
 
@@ -338,25 +371,29 @@ impl<S> BFS<S> where S: Clone + Default {
     }
 
     /// Run BFS on this grid. This will reset all state, so is safe to call multiple times.
-    pub fn run<'a, T>(&'a mut self, grid: &'a FixedGrid<T>, start_x: usize, start_y: usize, diagonal: bool, check: impl Fn(&'a T, (usize, usize), &S) -> BFSStep<S>) -> Option<(&'a T, usize, S)> {
-        if self.visited.width < grid.width || self.visited.height < grid.height {
-            self.visited = FixedGrid::blank(grid.width, grid.height);
-        } else {
-            self.visited.clear();
+    pub fn run_multilevel<'a, T>(&'a mut self, grid: &'a FixedGrid<T>, start_x: usize, start_y: usize, start_level: usize, diagonal: bool, check: impl Fn(&'a T, (usize, usize), usize, &S) -> BFSStep<S>) -> Option<(&'a T, usize, S)> {
+        for i in 0..self.visited.len() {
+            self.visited[i].clear();
+        }
+        while self.visited.len() <= start_level {
+            self.visited.push(FixedGrid::empty());
+        }
+        if self.visited[start_level].width < grid.width || self.visited[start_level].height < grid.height {
+            self.visited[start_level] = FixedGrid::blank(grid.width, grid.height);
         }
 
         self.found_pos = None;
 
         self.queue.clear();
-        self.queue.push_back((start_x, start_y, 0, S::default()));
+        self.queue.push_back((start_x, start_y, 0, start_level, S::default()));
 
         let offsets: &[(usize, usize)] = if diagonal { &OFFSETS_DIAGONAL } else { &OFFSETS_CARDINAL };
 
-        while let Some((x, y, l, state)) = self.queue.pop_front() {
-            self.visited.set(x, y, true);
-            let v = grid.get(x, y).unwrap();
+        while let Some((x, y, l, level, state)) = self.queue.pop_front() {
+            self.visited[level][(x, y)] = true;
+            let v = &grid[(x, y)];
 
-            match check(v, (x, y), &state) {
+            match check(v, (x, y), level, &state) {
                 BFSStep::Continue(new_state) => {
                     for (x_offset, y_offset) in offsets.iter() {
                         let x2 = x.wrapping_add(*x_offset);
@@ -367,16 +404,37 @@ impl<S> BFS<S> where S: Clone + Default {
                         if y2 >= grid.height() {
                             continue;
                         }
-                        if *self.visited.get(x2, y2).unwrap() {
+                        if *self.visited[level].get(x2, y2).unwrap() {
                             continue;
                         }
 
-                        self.queue.push_back((x2, y2, l + 1, new_state.clone()));
+                        self.queue.push_back((x2, y2, l + 1, level, new_state.clone()));
                     }
                 }
                 BFSStep::Found(new_state) => {
                     self.found_pos = Some((x, y));
                     return Some((v, l, new_state));
+                }
+                BFSStep::Warp(x, y, new_state) => {
+                    self.queue.push_front((x, y, l, level, new_state.clone()));
+                }
+                BFSStep::WarpLevel(x, y, level_change, new_state) => {
+                    if level_change < 0 && level == 0 {
+                        panic!("level underflow at len={}", l);
+                    }
+                    if level > 10000 {
+                        panic!("level overflow at len={}", l);
+                    }
+
+                    let new_level = (level as isize + level_change as isize) as usize;
+                    while self.visited.len() <= new_level {
+                        self.visited.push(FixedGrid::empty());
+                    }
+                    if self.visited[new_level].width < grid.width || self.visited[new_level].height < grid.height {
+                        self.visited[new_level] = FixedGrid::blank(grid.width, grid.height);
+                    }
+
+                    self.queue.push_front((x, y, l, new_level, new_state.clone()));
                 }
                 BFSStep::DeadEnd => {
                     // Do nothing.
@@ -387,9 +445,15 @@ impl<S> BFS<S> where S: Clone + Default {
         None
     }
 
+    pub fn run<'a, T>(&'a mut self, grid: &'a FixedGrid<T>, start_x: usize, start_y: usize, diagonal: bool, check: impl Fn(&'a T, (usize, usize), &S) -> BFSStep<S>) -> Option<(&'a T, usize, S)> {
+        self.run_multilevel(grid, start_x, start_y, 0, diagonal, |v, pos, _, state| {
+            check(v, pos, state)
+        })
+    }
+
     pub fn new() -> BFS<S> {
         BFS {
-            visited: FixedGrid::empty(),
+            visited: vec![FixedGrid::empty(); 1],
             queue: VecDeque::with_capacity(64),
             found_pos: None,
         }
