@@ -20,6 +20,17 @@ pub fn parse_u32(s: &str) -> u32 {
     res
 }
 
+pub fn parse_u32b(s: &[u8]) -> u32 {
+    let mut res = 0;
+
+    for c in s.iter() {
+        res *= 10;
+        res += (*c - b'0') as u32;
+    }
+
+    res
+}
+
 pub fn parse_u8(s: &str) -> u8 {
     let mut res = 0;
 
@@ -116,6 +127,41 @@ pub fn parse_u32s_amount(s: &[u8], vec: &mut Vec<u32>, amount: usize) -> usize {
     }
 
     vec.len()
+}
+
+pub fn parse_u32_pair(s: &[u8]) -> (u32, u32) {
+    let mut curr = 0;
+    let mut active = false;
+    let mut res = [0u32; 2];
+    let mut res_index = 0;
+
+    for b in s.iter() {
+        if res_index == 2 {
+            break;
+        }
+
+        match *b {
+            b'0'..=b'9' => {
+                active = true;
+                curr *= 10;
+                curr += (b - b'0') as u32;
+            }
+            _ => {
+                if active {
+                    res[res_index] = curr;
+                    res_index += 1;
+                    curr = 0;
+                }
+                active = false;
+            }
+        }
+    }
+
+    if active {
+        res[res_index] = curr;
+    }
+
+    (res[0], res[1])
 }
 
 pub fn parse_u32s_until(s: &[u8], vec: &mut Vec<u32>, stop: u8) -> usize {
