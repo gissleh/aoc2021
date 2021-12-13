@@ -1,7 +1,6 @@
 use common::aoc::{print_result, run_many, print_time_cold};
 use common::parsers::{parse_u32_pair, parse_u32b};
 use common::grid::FixedGrid;
-use std::mem::swap;
 
 fn main() {
     let input = include_bytes!("../input/day13.txt");
@@ -47,7 +46,6 @@ fn part2(points: &[(u32, u32)], folds: &[Fold]) -> FixedGrid<u8> {
 
 fn perform_folds(points: &[(u32, u32)], mut folds: &[Fold], fold_amount: Option<usize>) -> Vec<(u32, u32)> {
     let mut points = points.to_vec();
-    let mut next_points = Vec::with_capacity(points.len());
     if let Some(fold_amount) = fold_amount {
         folds = &folds[..fold_amount];
     }
@@ -70,14 +68,9 @@ fn perform_folds(points: &[(u32, u32)], mut folds: &[Fold], fold_amount: Option<
             }
         }
 
-        next_points.clear();
-        for (i, pi) in points.iter().enumerate() {
-            if (&points[i+1..]).iter().find(|pj| **pj == *pi).is_none() {
-                next_points.push(*pi);
-            }
-        }
 
-        swap(&mut points, &mut next_points);
+        points.sort_unstable();
+        points.dedup();
     }
 
     points
