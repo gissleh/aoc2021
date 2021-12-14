@@ -1,4 +1,5 @@
 use common::aoc::{print_result, run_many, print_time_cold};
+use num::Integer;
 
 fn main() {
     let input = include_bytes!("../input/day14.txt");
@@ -6,8 +7,6 @@ fn main() {
     let ((initial, polymerization), dur_p, dur_pc) = run_many(1000, || parse_input(input));
     let (res_p1, dur_p1, dur_p1c) = run_many(1000, || puzzle(&initial, &polymerization, 10));
     let (res_p2, dur_p2, dur_p2c) = run_many(1000, || puzzle(&initial, &polymerization, 40));
-
-    println!("{}", initial.iter().map(|v| (*v as u8 + b'A') as char ).collect::<String>());
 
     print_result("P1", res_p1);
     print_result("P2", res_p2);
@@ -21,14 +20,6 @@ fn main() {
 }
 
 fn puzzle(input: &[usize], rules: &[Option<usize>; 26 * 26], count: usize) -> u64 {
-    let res = polymerize(input, rules, count);
-    let min = res.iter().filter(|v| **v > 0).min().unwrap();
-    let max = res.iter().max().unwrap();
-
-    *max - *min
-}
-
-fn polymerize(input: &[usize], rules: &[Option<usize>; 26 * 26], count: usize) -> [u64; 26] {
     let mut vector = [0u64; 26 * 26];
     for v in input.windows(2) {
         let v = v[0] * 26 + v[1];
@@ -63,11 +54,16 @@ fn polymerize(input: &[usize], rules: &[Option<usize>; 26 * 26], count: usize) -
         res[i / 26] += *count;
         res[i % 26] += *count;
     }
-    for i in 0..26 {
-        res[i] /= 2;
-    }
 
-    res
+    let min = res.iter().filter(|v| **v > 0).min().unwrap();
+    let max = res.iter().max().unwrap();
+    let diff = *max - *min;
+
+    if diff.is_odd() {
+        (diff / 2) + 1
+    } else {
+        diff / 2
+    }
 }
 
 fn parse_input(input: &[u8]) -> (Vec<usize>, [Option<usize>; 26 * 26]) {
@@ -124,7 +120,6 @@ CN -> C
         let (input, polymerization) = parse_input(SAMPLE_1);
 
         assert_eq!(puzzle(&input, &polymerization, 10), 1588);
-        assert_eq!(polymerize(&input, &polymerization, 10), [0, 1749, 298, 0, 0, 0, 0, 161, 0, 0, 0, 0, 0, 865, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     }
 
     #[test]
@@ -132,7 +127,5 @@ CN -> C
         let (input, polymerization) = parse_input(SAMPLE_1);
 
         assert_eq!(puzzle(&input, &polymerization, 40), 2188189693529);
-        assert_eq!(polymerize(&input, &polymerization, 40)[1], 2192039569602);
-        assert_eq!(polymerize(&input, &polymerization, 40)[7], 3849876073);
     }
 }
