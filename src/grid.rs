@@ -499,8 +499,6 @@ impl Dijkstra {
         self.visited[self.start_pos] = 0;
 
         while let Some(search) = self.searches.pop() {
-            let mut added_any = false;
-
             let (x, y) = search.pos;
             for offset_pos in valid_offsets(self.diagonal, x, y, grid.width, grid.height) {
                 let v = &grid[offset_pos];
@@ -516,28 +514,30 @@ impl Dijkstra {
                         if self.visited[offset_pos] > new_cost {
                             self.visited[offset_pos] = new_cost;
 
-                            added_any = true;
-                            self.searches.push(DijkstraSearch{
+                            let new_search = DijkstraSearch {
                                 cost: new_cost,
                                 pos: offset_pos,
                                 heuristic,
-                            });
+                            };
+
+                            let index = if self.use_heuristic {
+                                self.searches.binary_search_by(|a| {
+                                    let a_f_score = a.cost + a.heuristic;
+                                    let b_f_score = new_search.cost + new_search.heuristic;
+                                    b_f_score.cmp(&a_f_score)
+                                })
+                            } else {
+                                self.searches.binary_search_by(|a| {
+                                    new_search.cost.cmp(&a.cost)
+                                })
+                            };
+
+                            match index {
+                                Ok(index) => self.searches.insert(index, new_search),
+                                Err(index) => self.searches.insert(index, new_search),
+                            }
                         }
                     }
-                }
-            }
-
-            if added_any {
-                if self.use_heuristic {
-                    self.searches.sort_unstable_by(|a, b| {
-                        let a_f_score = a.cost + a.heuristic;
-                        let b_f_score = b.cost + b.heuristic;
-                        b_f_score.cmp(&a_f_score)
-                    });
-                } else {
-                    self.searches.sort_unstable_by(|a, b| {
-                        b.cost.cmp(&a.cost)
-                    });
                 }
             }
         }
