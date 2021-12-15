@@ -122,6 +122,7 @@ name = "year2019-day20"
 path = "src/year2019-day20.rs"
 
 [dependencies]
+radix-heap = "0.4.1"
 chrono = "0.4.6"
 time = "0.1.40"
 num = "0.2.0"

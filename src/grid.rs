@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, VecDeque};
+use std::collections::{VecDeque};
 use std::ops::{Index, IndexMut};
+use radix_heap::{Radix, RadixHeapMap};
 
 #[derive(Clone)]
 pub struct GridSet<T> {
@@ -464,7 +465,7 @@ impl<S> BFS<S> where S: Clone + Default {
 #[derive(Clone)]
 pub struct Dijkstra {
     visited: FixedGrid<i64>,
-    searches: BinaryHeap<DijkstraSearch>,
+    searches: RadixHeapMap<DijkstraSearch, ()>,
     found_pos: Option<(usize, usize)>,
     found_cost: Option<i64>,
     diagonal: bool,
@@ -495,10 +496,10 @@ impl Dijkstra {
             cost: self.start_cost,
             heuristic: 0,
             pos: self.start_pos,
-        });
+        }, ());
         self.visited[self.start_pos] = 0;
 
-        while let Some(search) = self.searches.pop() {
+        while let Some((search, _)) = self.searches.pop() {
             let (x, y) = search.pos;
             for offset_pos in valid_offsets(self.diagonal, x, y, grid.width, grid.height) {
                 let v = &grid[offset_pos];
@@ -518,7 +519,7 @@ impl Dijkstra {
                                 cost: new_cost,
                                 pos: offset_pos,
                                 heuristic,
-                            });
+                            }, ());
                         }
                     }
                 }
@@ -535,7 +536,7 @@ impl Dijkstra {
             found_cost: None,
             found_pos: None,
             visited: FixedGrid::empty(),
-            searches: BinaryHeap::with_capacity(512),
+            searches: RadixHeapMap::new(),
         }
     }
 }
@@ -545,6 +546,17 @@ pub struct DijkstraSearch {
     pos: (usize, usize),
     heuristic: i64,
     cost: i64,
+}
+
+impl Radix for DijkstraSearch {
+    fn radix_similarity(&self, other: &Self) -> u32 {
+        let a_f_score = self.cost + self.heuristic;
+        let b_f_score = other.cost + other.heuristic;
+
+        b_f_score.radix_similarity(&a_f_score)
+    }
+
+    const RADIX_BITS: u32 = 64;
 }
 
 impl PartialOrd<Self> for DijkstraSearch {
