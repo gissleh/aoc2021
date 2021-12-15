@@ -5,8 +5,8 @@ fn main() {
     let input = include_bytes!("../input/day15.txt");
 
     let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input));
-    let (res_p1, dur_p1, dur_p1c) = run_many(500, || part1(&input));
-    let (res_p2, dur_p2, dur_p2c) = run_many(20, || part2(&input));
+    let (res_p1, dur_p1, dur_p1c) = run_many(5, || part1(&input));
+    let (res_p2, dur_p2, dur_p2c) = run_many(5, || part2(&input));
 
     print_result("P1", res_p1);
     print_result("P2", res_p2);
@@ -28,7 +28,7 @@ fn checker<'a>(target: &'a (usize, usize)) -> impl Fn(&'a i64, (usize, usize)) -
 }
 
 fn part1(input: &FixedGrid<i64>) -> i64 {
-    let mut dijkstra = Dijkstra::new(false, false, 0, 0, 0);
+    let mut dijkstra = Dijkstra::new(false, 0, 0, 0);
     let target = (input.width()-1, input.height()-1);
     dijkstra.run(input, checker(&target));
 
@@ -54,7 +54,7 @@ fn part2(input: &FixedGrid<i64>) -> i64 {
         }
     }
 
-    let mut dijkstra = Dijkstra::new(false, false, 0, 0, 0);
+    let mut dijkstra = Dijkstra::new(false, 0, 0, 0);
     let target = (big_grid.width()-1, big_grid.height()-1);
     dijkstra.run(&big_grid, checker(&target));
 
