@@ -1,5 +1,5 @@
 use common::aoc::{print_result, run_many, print_time_cold};
-use common::grid::{FixedGrid, BFS, BFSStep};
+use common::grid::{FixedGrid, BFS, BFSStep, manhattan_distance};
 use smallvec::{SmallVec, smallvec};
 
 fn main() {
@@ -199,18 +199,6 @@ impl Maze {
             start_position,
         }
     }
-}
-
-fn abs_diff(a: usize, b: usize) -> usize {
-    if a > b {
-        a - b
-    } else {
-        b - a
-    }
-}
-
-fn manhattan_distance(a: (usize, usize), b: (usize, usize)) -> usize {
-    abs_diff(a.0, b.0) + abs_diff(a.1, b.1)
 }
 
 #[cfg(test)]

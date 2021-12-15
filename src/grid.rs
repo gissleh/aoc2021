@@ -460,6 +460,118 @@ impl<S> BFS<S> where S: Clone + Default {
     }
 }
 
+#[derive(Clone)]
+pub struct Dijkstra {
+    visited: FixedGrid<i64>,
+    searches: Vec<DijkstraSearch>,
+    found_pos: Option<(usize, usize)>,
+    found_cost: Option<i64>,
+    diagonal: bool,
+    start_pos: (usize, usize),
+    start_cost: i64,
+    use_heuristic: bool,
+}
+
+impl Dijkstra {
+    pub fn found_pos(&self) -> Option<(usize, usize)> {
+        self.found_pos
+    }
+
+    pub fn found_cost(&self) -> Option<i64> {
+        self.found_cost
+    }
+
+    pub fn visited(&self) -> &FixedGrid<i64> {
+        &self.visited
+    }
+
+    pub fn run<'a, T>(&mut self, grid: &'a FixedGrid<T>, check: impl Fn(&'a T, (usize, usize)) -> DijkstraStep) {
+        self.visited = FixedGrid::new(grid.width, grid.height, i64::MAX);
+        self.found_pos = None;
+        self.found_cost = None;
+
+        self.searches.clear();
+        self.searches.push(DijkstraSearch {
+            cost: self.start_cost,
+            heuristic: 0,
+            pos: self.start_pos,
+        });
+        self.visited[self.start_pos] = 0;
+
+        while let Some(search) = self.searches.pop() {
+            let mut added_any = false;
+
+            let (x, y) = search.pos;
+            for offset_pos in valid_offsets(self.diagonal, x, y, grid.width, grid.height) {
+                let v = &grid[offset_pos];
+                match check(v, offset_pos) {
+                    DijkstraStep::DeadEnd => {}
+                    DijkstraStep::Found(cost) => {
+                        self.found_pos = Some(offset_pos);
+                        self.found_cost = Some(search.cost + cost);
+                        return;
+                    }
+                    DijkstraStep::Continue(cost, heuristic) => {
+                        let new_cost = cost + search.cost;
+                        if self.visited[offset_pos] > new_cost {
+                            self.visited[offset_pos] = new_cost;
+
+                            added_any = true;
+                            self.searches.push(DijkstraSearch{
+                                cost: new_cost,
+                                pos: offset_pos,
+                                heuristic,
+                            });
+                        }
+                    }
+                }
+            }
+
+            if added_any {
+                if self.use_heuristic {
+                    self.searches.sort_unstable_by(|a, b| {
+                        let a_f_score = a.cost + a.heuristic;
+                        let b_f_score = b.cost + b.heuristic;
+                        b_f_score.cmp(&a_f_score)
+                    });
+                } else {
+                    self.searches.sort_unstable_by(|a, b| {
+                        b.cost.cmp(&a.cost)
+                    });
+                }
+            }
+        }
+    }
+
+    pub fn new(diagonal: bool, use_heuristic: bool, start_x: usize, start_y: usize, start_cost: i64) -> Dijkstra {
+        Dijkstra {
+            diagonal,
+            start_cost,
+            use_heuristic,
+
+            start_pos: (start_x, start_y),
+            found_cost: None,
+            found_pos: None,
+            visited: FixedGrid::empty(),
+            searches: Vec::with_capacity(64),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DijkstraSearch {
+    pos: (usize, usize),
+    heuristic: i64,
+    cost: i64,
+}
+
+#[derive(Debug)]
+pub enum DijkstraStep {
+    DeadEnd,
+    Continue(i64, i64),
+    Found(i64),
+}
+
 pub fn valid_offsets(diagonal: bool, x: usize, y: usize, w: usize, h: usize) -> impl Iterator<Item=(usize, usize)> {
     let offsets = if diagonal { OFFSETS_DIAGONAL.as_slice() } else { OFFSETS_CARDINAL.as_slice() };
 
@@ -468,6 +580,19 @@ pub fn valid_offsets(diagonal: bool, x: usize, y: usize, w: usize, h: usize) -> 
         y.wrapping_add(*yo),
     )).filter(move |(x, y)| *x < w && *y < h)
 }
+
+fn abs_diff(a: usize, b: usize) -> usize {
+    if a > b {
+        a - b
+    } else {
+        b - a
+    }
+}
+
+pub fn manhattan_distance(a: (usize, usize), b: (usize, usize)) -> usize {
+    abs_diff(a.0, b.0) + abs_diff(a.1, b.1)
+}
+
 
 #[cfg(test)]
 pub mod tests {
