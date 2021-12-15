@@ -19,22 +19,22 @@ fn main() {
     assert_ne!(res_p2, 3447389044529);
 }
 
-fn puzzle(input: &[usize], rules: &[Option<usize>; 26 * 26], count: usize) -> u64 {
-    let mut vector = [0u64; 26 * 26];
+fn puzzle(input: &[usize], rules: &[Option<usize>; 100], count: usize) -> u64 {
+    let mut vector = [0u64; 100];
     for v in input.windows(2) {
-        let v = v[0] * 26 + v[1];
+        let v = v[0] * 10 + v[1];
         vector[v] += 1;
     }
 
     for _ in 0..count {
-        let mut vector2 = [0u64; 26 * 26];
+        let mut vector2 = [0u64; 100];
 
         for (i, c) in rules.iter().enumerate() {
             if let Some(c) = c {
-                let a = i / 26;
-                let b = i % 26;
-                let ac = (a * 26) + *c;
-                let cb = (*c * 26) + b;
+                let a = i / 10;
+                let b = i % 10;
+                let ac = (a * 10) + *c;
+                let cb = (*c * 10) + b;
 
                 vector2[ac] += vector[i];
                 vector2[cb] += vector[i];
@@ -46,13 +46,13 @@ fn puzzle(input: &[usize], rules: &[Option<usize>; 26 * 26], count: usize) -> u6
         vector = vector2;
     }
 
-    let mut res = [0u64; 26];
+    let mut res = [0u64; 10];
     for v in input.iter() {
         res[*v] += 1;
     }
     for (i, count) in vector.iter().enumerate() {
-        res[i / 26] += *count;
-        res[i % 26] += *count;
+        res[i / 10] += *count;
+        res[i % 10] += *count;
     }
 
     let min = res.iter().filter(|v| **v > 0).min().unwrap();
@@ -66,23 +66,40 @@ fn puzzle(input: &[usize], rules: &[Option<usize>; 26 * 26], count: usize) -> u6
     }
 }
 
-fn parse_input(input: &[u8]) -> (Vec<usize>, [Option<usize>; 26 * 26]) {
+fn parse_input(input: &[u8]) -> (Vec<usize>, [Option<usize>; 100]) {
+    let letters_exist = input.iter()
+        .filter(|v| **v >= b'A' && **v <= b'Z')
+        .fold([false; 26], |mut f, i| {
+            f[(i - b'A') as usize] = true;
+            f
+        });
+    let mut polymerization = [None; 100];
+
+    let mut index_map = [0usize; 26];
+    let mut next_index = 0usize;
+    for i in 0..26 {
+        if letters_exist[i] {
+            index_map[i] = next_index;
+            next_index += 1;
+        }
+    }
+    assert!(next_index <= 10);
+
     let initial_state = input.iter()
         .take_while(|v| **v != b'\n')
-        .map(|v| (*v - b'A') as usize)
+        .map(|v| index_map[(*v - b'A') as usize])
         .collect();
-    let mut polymerization = [None; 26 * 26];
 
     for line in input.split(|v| *v == b'\n').skip(2) {
         if line.is_empty() {
             continue;
         }
 
-        let a = (line[0] - b'A') as usize;
-        let b = (line[1] - b'A') as usize;
-        let c = (line[6] - b'A') as usize;
+        let a = index_map[(line[0] - b'A') as usize];
+        let b = index_map[(line[1] - b'A') as usize];
+        let c = index_map[(line[6] - b'A') as usize];
 
-        polymerization[(a * 26) + b] = Some(c);
+        polymerization[(a * 10) + b] = Some(c);
     }
 
     (

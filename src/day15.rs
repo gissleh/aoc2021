@@ -5,8 +5,8 @@ fn main() {
     let input = include_bytes!("../input/day15.txt");
 
     let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input));
-    let (res_p1, dur_p1, dur_p1c) = run_many(5, || part1(&input));
-    let (res_p2, dur_p2, dur_p2c) = run_many(5, || part2(&input));
+    let (res_p1, dur_p1, dur_p1c) = run_many(1000, || part1(&input));
+    let (res_p2, dur_p2, dur_p2c) = run_many(50, || part2(&input));
 
     print_result("P1", res_p1);
     print_result("P2", res_p2);
