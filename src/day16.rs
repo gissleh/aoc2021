@@ -17,42 +17,51 @@ fn main() {
     print_time_cold("Total", dur_p + dur_p1 + dur_p2, dur_pc + dur_p1c + dur_p2c);
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
-enum PacketData {
-    Operator(u32, Vec<Packet>),
-    Literal(u64),
-}
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 struct Packet {
     version: u32,
-    data: PacketData,
+    type_id: u32,
+    value: u64,
+    subs: Vec<Packet>,
 }
 
 impl Packet {
     fn version_sum(&self) -> u32 {
-        if let PacketData::Operator(_, subs) = &self.data {
-            self.version + subs.iter().map(|s| s.version_sum()).sum::<u32>()
-        } else {
-            self.version
-        }
+        self.version + self.subs.iter().map(|s| s.version_sum()).sum::<u32>()
     }
 
     fn value(&self) -> u64 {
-        match &self.data {
-            PacketData::Literal(v) => { *v }
-            PacketData::Operator(id, subs) => {
-                match id {
-                    0 => subs.iter().map(|v| v.value()).sum::<u64>(),
-                    1 => subs.iter().map(|v| v.value()).product::<u64>(),
-                    2 => subs.iter().map(|v| v.value()).min().unwrap(),
-                    3 => subs.iter().map(|v| v.value()).max().unwrap(),
-                    5 => if subs[0].value() > subs[1].value() { 1 } else { 0 },
-                    6 => if subs[0].value() < subs[1].value() { 1 } else { 0 },
-                    7 => if subs[0].value() == subs[1].value() { 1 } else { 0 },
-                    _ => unreachable!(),
-                }
-            }
+        match self.type_id {
+            0 => self.subs.iter().map(|v| v.value()).sum::<u64>(),
+            1 => self.subs.iter().map(|v| v.value()).product::<u64>(),
+            2 => self.subs.iter().map(|v| v.value()).min().unwrap(),
+            3 => self.subs.iter().map(|v| v.value()).max().unwrap(),
+            4 => self.value,
+            5 => if self.subs[0].value() > self.subs[1].value() { 1 } else { 0 },
+            6 => if self.subs[0].value() < self.subs[1].value() { 1 } else { 0 },
+            7 => if self.subs[0].value() == self.subs[1].value() { 1 } else { 0 },
+            _ => unreachable!(),
+        }
+    }
+
+    #[allow(dead_code)]
+    fn literal(version: u32, value: u64) -> Packet {
+        Packet {
+            version,
+            value,
+            type_id: 4,
+            subs: Vec::new(),
+        }
+    }
+
+    #[allow(dead_code)]
+    fn operator(version: u32, type_id: u32, subs: Vec<Packet>) -> Packet {
+        Packet {
+            version,
+            type_id,
+            subs,
+            value: 0,
         }
     }
 
@@ -70,21 +79,21 @@ impl Packet {
                     value |= (v & 0b01111) as u64;
 
                     if v & 0b10000 == 0 {
-                        break
+                        break;
                     }
                 }
 
-                (Packet{version, data: PacketData::Literal(value)}, reader.pos())
+                (Packet { version, type_id, value, subs: Vec::new() }, reader.pos())
             }
 
             _ => {
-                let mut sub_packets = Vec::with_capacity(4);
+                let mut subs = Vec::with_capacity(4);
                 let size_type = reader.read(1);
                 if size_type == 1 {
                     let count = reader.read(11);
                     for _ in 0..count {
                         let (packet, new_pos) = Packet::parse(data, reader.pos());
-                        sub_packets.push(packet);
+                        subs.push(packet);
                         reader.set_pos(new_pos);
                     }
                 } else {
@@ -92,12 +101,17 @@ impl Packet {
                     let target_pos = reader.pos() + total_size;
                     while reader.pos() < target_pos {
                         let (packet, new_pos) = Packet::parse(data, reader.pos());
-                        sub_packets.push(packet);
+                        subs.push(packet);
                         reader.set_pos(new_pos);
                     }
                 }
 
-                (Packet{version, data: PacketData::Operator(type_id, sub_packets)}, reader.pos())
+                (Packet {
+                    version,
+                    type_id,
+                    subs,
+                    value: 0,
+                }, reader.pos())
             }
         }
     }
@@ -106,7 +120,7 @@ impl Packet {
         let mut data = vec![0u8; (hex.len() / 2) + 1];
         for (i, h) in hex.iter().filter(|v| **v != b'\n').enumerate() {
             let byte_index = i / 2;
-            let bits = (1-(i & 1)) * 4;
+            let bits = (1 - (i & 1)) * 4;
 
             data[byte_index] |= parse_hex(*h) << bits;
         }
@@ -122,42 +136,20 @@ mod tests {
 
     #[test]
     fn test_parse() {
-        assert_eq!(Packet::parse_hex(b"D2FE28"), Packet{
-            version: 6,
-            data: PacketData::Literal(2021)
-        });
+        assert_eq!(Packet::parse_hex(b"D2FE28"), Packet::literal(6, 2021));
 
-        assert_eq!(Packet::parse_hex(b"38006F45291200"), Packet{
-            version: 1,
-            data: PacketData::Operator(6, vec![
-                Packet{
-                    version: 6,
-                    data: PacketData::Literal(10)
-                },
-                Packet{
-                    version: 2,
-                    data: PacketData::Literal(20)
-                },
-            ])
-        });
+        assert_eq!(Packet::parse_hex(b"38006F45291200"), Packet::operator(
+            1, 6, vec![
+                Packet::literal(6, 10),
+                Packet::literal(2, 20),
+            ]));
 
-        assert_eq!(Packet::parse_hex(b"EE00D40C823060"), Packet{
-            version: 7,
-            data: PacketData::Operator(3, vec![
-                Packet{
-                    version: 2,
-                    data: PacketData::Literal(1)
-                },
-                Packet{
-                    version: 4,
-                    data: PacketData::Literal(2)
-                },
-                Packet{
-                    version: 1,
-                    data: PacketData::Literal(3)
-                },
-            ])
-        });
+        assert_eq!(Packet::parse_hex(b"EE00D40C823060"), Packet::operator(
+            7, 3, vec![
+                Packet::literal(2, 1),
+                Packet::literal(4, 2),
+                Packet::literal(1, 3),
+            ]));
     }
 
     #[test]

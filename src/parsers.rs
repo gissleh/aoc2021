@@ -245,8 +245,7 @@ impl<'a> BitReader<'a> {
 
             #[cfg(test)]
             println!("remaining={} i={} j={} shift={} read_size={} mask={:b} = {}",
-                     remaining, i, j, shift, read_size, mask, value,
-            );
+                     remaining, i, j, shift, read_size, mask, value);
 
             res <<= read_size;
             res |= value;
@@ -269,20 +268,20 @@ mod tests {
 
     #[test]
     fn test_reader() {
-        let data = vec![0xff, 0xff, 0x00, 0xab, 0xcf, 0x12, 0x34, 0xff, 0xff, 0xf0];
-        let mut stuff = BitReader::new(&data, 0);
+        let data = vec![0xff, 0xff, 0x00, 0xab, 0xcf, 0x12, 0x34, 0xff, 0xa4, 0xf0];
+        let mut reader = BitReader::new(&data, 0);
 
-        assert_eq!(stuff.read(4), 0xf);
-        assert_eq!(stuff.read(2), 0x3);
-        assert_eq!(stuff.read(3), 0x7);
-        assert_eq!(stuff.read(3), 0x7);
-        assert_eq!(stuff.read(4), 0xf);
-        assert_eq!(stuff.read(4), 0x0);
-        assert_eq!(stuff.read(4), 0x0);
-        assert_eq!(stuff.read(4), 0xa);
-        assert_eq!(stuff.read(4), 0xb);
-        assert_eq!(stuff.read(8), 0xcf);
-        assert_eq!(stuff.read(16), 0x1234);
-        assert_eq!(stuff.read(24), 0xfffff0);
+        assert_eq!(reader.read(4), 0xf);
+        assert_eq!(reader.read(2), 0x3);
+        assert_eq!(reader.read(3), 0x7);
+        assert_eq!(reader.read(3), 0x7);
+        assert_eq!(reader.read(4), 0xf);
+        assert_eq!(reader.read(4), 0x0);
+        assert_eq!(reader.read(4), 0x0);
+        assert_eq!(reader.read(4), 0xa);
+        assert_eq!(reader.read(4), 0xb);
+        assert_eq!(reader.read(8), 0xcf);
+        assert_eq!(reader.read(16), 0x1234);
+        assert_eq!(reader.read(24), 0xffa4f0);
     }
 }
