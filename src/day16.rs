@@ -45,7 +45,7 @@ impl Packet {
         }
     }
 
-    #[allow(dead_code)]
+    #[inline]
     fn literal(version: u32, value: u64) -> Packet {
         Packet {
             version,
@@ -55,7 +55,7 @@ impl Packet {
         }
     }
 
-    #[allow(dead_code)]
+    #[inline]
     fn operator(version: u32, type_id: u32, subs: Vec<Packet>) -> Packet {
         Packet {
             version,
@@ -83,7 +83,7 @@ impl Packet {
                     }
                 }
 
-                (Packet { version, type_id, value, subs: Vec::new() }, reader.pos())
+                (Packet::literal(version, value), reader.pos())
             }
 
             _ => {
@@ -106,12 +106,7 @@ impl Packet {
                     }
                 }
 
-                (Packet {
-                    version,
-                    type_id,
-                    subs,
-                    value: 0,
-                }, reader.pos())
+                (Packet::operator(version, type_id, subs), reader.pos())
             }
         }
     }
@@ -120,7 +115,7 @@ impl Packet {
         let mut data = vec![0u8; (hex.len() / 2) + 1];
         for (i, h) in hex.iter().filter(|v| **v != b'\n').enumerate() {
             let byte_index = i / 2;
-            let bits = (1 - (i & 1)) * 4;
+            let bits = if i % 2 == 0 { 4 } else { 0 };
 
             data[byte_index] |= parse_hex(*h) << bits;
         }
@@ -142,14 +137,16 @@ mod tests {
             1, 6, vec![
                 Packet::literal(6, 10),
                 Packet::literal(2, 20),
-            ]));
+            ],
+        ));
 
         assert_eq!(Packet::parse_hex(b"EE00D40C823060"), Packet::operator(
             7, 3, vec![
                 Packet::literal(2, 1),
                 Packet::literal(4, 2),
                 Packet::literal(1, 3),
-            ]));
+            ],
+        ));
     }
 
     #[test]
