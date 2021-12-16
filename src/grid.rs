@@ -1,5 +1,7 @@
-use std::collections::VecDeque;
+use std::cmp::Ordering;
+use std::collections::{VecDeque};
 use std::ops::{Index, IndexMut};
+use radix_heap::{Radix, RadixHeapMap};
 
 #[derive(Clone)]
 pub struct GridSet<T> {
@@ -463,13 +465,12 @@ impl<S> BFS<S> where S: Clone + Default {
 #[derive(Clone)]
 pub struct Dijkstra {
     visited: FixedGrid<i64>,
-    searches: Vec<DijkstraSearch>,
+    searches: RadixHeapMap<DijkstraSearch, ()>,
     found_pos: Option<(usize, usize)>,
     found_cost: Option<i64>,
     diagonal: bool,
     start_pos: (usize, usize),
     start_cost: i64,
-    use_heuristic: bool,
 }
 
 impl Dijkstra {
@@ -495,10 +496,10 @@ impl Dijkstra {
             cost: self.start_cost,
             heuristic: 0,
             pos: self.start_pos,
-        });
+        }, ());
         self.visited[self.start_pos] = 0;
 
-        while let Some(search) = self.searches.pop() {
+        while let Some((search, _)) = self.searches.pop() {
             let (x, y) = search.pos;
             for offset_pos in valid_offsets(self.diagonal, x, y, grid.width, grid.height) {
                 let v = &grid[offset_pos];
@@ -514,28 +515,11 @@ impl Dijkstra {
                         if self.visited[offset_pos] > new_cost {
                             self.visited[offset_pos] = new_cost;
 
-                            let new_search = DijkstraSearch {
+                            self.searches.push(DijkstraSearch {
                                 cost: new_cost,
                                 pos: offset_pos,
                                 heuristic,
-                            };
-
-                            let index = if self.use_heuristic {
-                                self.searches.binary_search_by(|a| {
-                                    let a_f_score = a.cost + a.heuristic;
-                                    let b_f_score = new_search.cost + new_search.heuristic;
-                                    b_f_score.cmp(&a_f_score)
-                                })
-                            } else {
-                                self.searches.binary_search_by(|a| {
-                                    new_search.cost.cmp(&a.cost)
-                                })
-                            };
-
-                            match index {
-                                Ok(index) => self.searches.insert(index, new_search),
-                                Err(index) => self.searches.insert(index, new_search),
-                            }
+                            }, ());
                         }
                     }
                 }
@@ -543,26 +527,52 @@ impl Dijkstra {
         }
     }
 
-    pub fn new(diagonal: bool, use_heuristic: bool, start_x: usize, start_y: usize, start_cost: i64) -> Dijkstra {
+    pub fn new(diagonal: bool, start_x: usize, start_y: usize, start_cost: i64) -> Dijkstra {
         Dijkstra {
             diagonal,
             start_cost,
-            use_heuristic,
 
             start_pos: (start_x, start_y),
             found_cost: None,
             found_pos: None,
             visited: FixedGrid::empty(),
-            searches: Vec::with_capacity(64),
+            searches: RadixHeapMap::new(),
         }
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DijkstraSearch {
     pos: (usize, usize),
     heuristic: i64,
     cost: i64,
+}
+
+impl Radix for DijkstraSearch {
+    fn radix_similarity(&self, other: &Self) -> u32 {
+        let a_f_score = self.cost + self.heuristic;
+        let b_f_score = other.cost + other.heuristic;
+
+        b_f_score.radix_similarity(&a_f_score)
+    }
+
+    const RADIX_BITS: u32 = 64;
+}
+
+impl PartialOrd<Self> for DijkstraSearch {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DijkstraSearch {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        let a_f_score = self.cost + self.heuristic;
+        let b_f_score = other.cost + other.heuristic;
+        b_f_score.cmp(&a_f_score).then_with(|| self.pos.cmp(&other.pos))
+    }
 }
 
 #[derive(Debug)]

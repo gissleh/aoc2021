@@ -1,4 +1,5 @@
 extern crate num;
+extern crate radix_heap;
 
 pub mod aoc;
 pub mod grid;
