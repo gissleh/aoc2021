@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 pub fn parse_u64(s: &str) -> u64 {
     let mut res = 0;
 
@@ -58,7 +60,7 @@ pub fn parse_binary_u32(s: &str) -> u32 {
 
     for c in s.bytes() {
         res *= 2;
-        res += if c == b'1' {1} else {0};
+        res += if c == b'1' { 1 } else { 0 };
     }
 
     res
@@ -170,7 +172,7 @@ pub fn parse_u32s_until(s: &[u8], vec: &mut Vec<u32>, stop: u8) -> usize {
 
     for (i, b) in s.iter().enumerate() {
         if *b == stop {
-            return i+1;
+            return i + 1;
         }
 
         match *b {
@@ -194,4 +196,93 @@ pub fn parse_u32s_until(s: &[u8], vec: &mut Vec<u32>, stop: u8) -> usize {
     }
 
     s.len()
+}
+
+pub fn parse_hex(hex: u8) -> u8 {
+    match hex {
+        b'0'..=b'9' => hex - b'0',
+        b'A'..=b'F' => (hex - b'A') + 10,
+        _ => unreachable!(),
+    }
+}
+
+const BR_MASKS: [u8; 9] = [
+    0b00000000,
+    0b10000000,
+    0b11000000,
+    0b11100000,
+    0b11110000,
+    0b11111000,
+    0b11111100,
+    0b11111110,
+    0b11111111,
+];
+
+pub struct BitReader<'a> {
+    data: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> BitReader<'a> {
+    pub fn set_pos(&mut self, v: usize) {
+        self.pos = v;
+    }
+
+    pub fn pos(&self) -> usize {
+        self.pos
+    }
+
+    pub fn read(&mut self, n: usize) -> u32 {
+        let mut remaining = n;
+        let mut res = 0;
+        while remaining > 0 {
+            let i = self.pos / 8;
+            let j = self.pos % 8;
+            let read_size = min(remaining, 8 - j);
+            let mask = BR_MASKS[read_size] >> j;
+            let shift = 8 - j - read_size;
+            let value = ((self.data[i] & mask) >> shift) as u32;
+
+            #[cfg(test)]
+            println!("remaining={} i={} j={} shift={} read_size={} mask={:b} = {}",
+                     remaining, i, j, shift, read_size, mask, value,
+            );
+
+            res <<= read_size;
+            res |= value;
+
+            self.pos += read_size;
+            remaining -= read_size;
+        }
+
+        res
+    }
+
+    pub fn new(data: &'a [u8], pos: usize) -> BitReader<'a> {
+        BitReader { data, pos }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_reader() {
+        let data = vec![0xff, 0xff, 0x00, 0xab, 0xcf, 0x12, 0x34, 0xff, 0xff, 0xf0];
+        let mut stuff = BitReader::new(&data, 0);
+
+        assert_eq!(stuff.read(4), 0xf);
+        assert_eq!(stuff.read(2), 0x3);
+        assert_eq!(stuff.read(3), 0x7);
+        assert_eq!(stuff.read(3), 0x7);
+        assert_eq!(stuff.read(4), 0xf);
+        assert_eq!(stuff.read(4), 0x0);
+        assert_eq!(stuff.read(4), 0x0);
+        assert_eq!(stuff.read(4), 0xa);
+        assert_eq!(stuff.read(4), 0xb);
+        assert_eq!(stuff.read(8), 0xcf);
+        assert_eq!(stuff.read(16), 0x1234);
+        assert_eq!(stuff.read(24), 0xfffff0);
+    }
 }
