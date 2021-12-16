@@ -1,11 +1,10 @@
-use common::aoc::{load_input, print_result, print_time, run_many, run_once, print_time_cold};
+use common::aoc::{print_result, run_many, print_time_cold};
+use common::parsers::parse_u32b;
 
 fn main() {
-    let (input, dur_load) = run_once(|| load_input("day02"));
+    let input = include_bytes!("../input/day02.txt");
 
-    print_time("Load", dur_load);
-
-    let (input, dur_p, dur_pc) = run_many(1000, || parse_input(&input));
+    let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input));
     let (res_p1, dur_p1, dur_p1c) = run_many(100000, || part1(&input));
     let (res_p2, dur_p2, dur_p2c) = run_many(100000, || part2(&input));
 
@@ -38,17 +37,18 @@ fn part2(input: &[(i32, i32)]) -> i32 {
     horizontal_sum * depth_sum
 }
 
-fn parse_input(input: &str) -> Vec<(i32, i32)> {
-    input.lines()
+fn parse_input(input: &[u8]) -> Vec<(i32, i32)> {
+    input.split(|b| *b == b'\n')
         .filter(|l| !l.is_empty())
         .map(|v| {
-            let (dir, len_str) = v.split_once(' ').unwrap();
-            let len = len_str.parse::<i32>().unwrap();
+            let dir = v[0];
+            let space_pos = v.iter().take_while(|b| **b != b' ').count();
+            let len = parse_u32b(&v[space_pos+1..]) as i32;
 
             match dir {
-                "down" => (0, len),
-                "up" => (0, -len),
-                "forward" => (len, 0),
+                b'd' => (0, len),
+                b'u' => (0, -len),
+                b'f' => (len, 0),
                 _ => unreachable!(),
             }
         })
