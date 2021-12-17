@@ -1,6 +1,6 @@
 use common::aoc::{print_result, run_many, print_time_cold};
-use common::parsers::{parse_u32_pair, parse_u32b};
 use common::grid::FixedGrid;
+use common::parser::{Parser, parse_uint};
 
 fn main() {
     let input = include_bytes!("../input/day13.txt");
@@ -83,23 +83,24 @@ enum Fold {
 fn parse_input(input: &[u8]) -> (Vec<(u32, u32)>, Vec<Fold>) {
     let mut points = Vec::with_capacity(64);
     let mut folds = Vec::with_capacity(32);
+    let mut parser = Parser::new(input).helper();
 
-    let mut parsing_points = true;
-    for line in input.split(|p| *p == b'\n') {
-        if line.is_empty() {
-            parsing_points = false;
-            continue;
-        }
+    while let Some(x) = parser.uint(false) {
+        let y = parser.uint(true).unwrap();
+        points.push((x, y));
+        parser.skip_rest_of_line();
+    }
 
-        if parsing_points {
-            points.push(parse_u32_pair(line));
-        } else {
-            folds.push(match line[11] {
-                b'x' => Fold::X(parse_u32b(&line[13..])),
-                b'y' => Fold::Y(parse_u32b(&line[13..])),
-                _ => unreachable!(),
-            });
-        }
+    parser.skip_rest_of_line();
+
+    while let Some(line) = parser.line() {
+        let (v, _) = parse_uint(&line[13..]).unwrap();
+
+        folds.push(match line[11] {
+            b'x' => Fold::X(v),
+            b'y' => Fold::Y(v),
+            _ => unreachable!(),
+        });
     }
 
     (points, folds)

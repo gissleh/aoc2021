@@ -1,5 +1,6 @@
 use common::aoc::{print_result, run_many, print_time_cold};
-use common::parsers::{parse_hex, BitReader};
+use common::parsers::{BitReader};
+use common::parser::{Parser};
 
 fn main() {
     let input = include_bytes!("../input/day16.txt");
@@ -112,12 +113,11 @@ impl Packet {
     }
 
     fn parse_hex(hex: &[u8]) -> Packet {
-        let mut data = vec![0u8; (hex.len() / 2) + 1];
-        for (i, h) in hex.iter().filter(|v| **v != b'\n').enumerate() {
-            let byte_index = i / 2;
-            let bits = if i % 2 == 0 { 4 } else { 0 };
+        let mut data= Vec::with_capacity((hex.len() / 2) + 1);
+        let mut parser = Parser::new(hex).helper();
 
-            data[byte_index] |= parse_hex(*h) << bits;
+        while let Some(v) = parser.hex_byte(true) {
+            data.push(v);
         }
 
         let (packet, _) = Packet::parse(&data, 0);
