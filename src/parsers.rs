@@ -131,6 +131,47 @@ pub fn parse_u32s_amount(s: &[u8], vec: &mut Vec<u32>, amount: usize) -> usize {
     vec.len()
 }
 
+pub fn parse_i32s_amount(s: &[u8], dst: &mut [i32], amount: usize) -> usize {
+    let mut curr = 0;
+    let mut active = false;
+    let mut index = 0;
+    let mut neg = false;
+    let amount = min(dst.len(), amount);
+
+    for (i, b) in s.iter().enumerate() {
+        match *b {
+            b'0'..=b'9' => {
+                active = true;
+                curr *= 10;
+                curr += (b - b'0') as i32;
+            }
+            b'-' => {
+                neg = true;
+            }
+            _ => {
+                if active {
+                    dst[index] = if neg { -curr } else { curr };
+                    index += 1;
+                    curr = 0;
+                    neg = false;
+
+                    if index == amount {
+                        return i + 1;
+                    }
+                }
+                active = false;
+            }
+        }
+    }
+
+    if active {
+        dst[index] = curr;
+    }
+
+    dst.len()
+}
+
+
 pub fn parse_u32_pair(s: &[u8]) -> (u32, u32) {
     let mut curr = 0;
     let mut active = false;
