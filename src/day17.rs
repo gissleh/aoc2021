@@ -177,6 +177,7 @@ mod tests {
     use super::*;
 
     const SAMPLE_INPUT: [i32; 4] = [20, 30, -10, -5];
+    const SAMPLE_INPUT_2: [i32; 4] = [352, 377, -49, -30];
 
     #[test]
     fn test_target_area() {
@@ -192,13 +193,13 @@ mod tests {
 
     #[test]
     fn test_part1() {
-        let target = TargetArea::from(&SAMPLE_INPUT);
-        assert_eq!(part1(&target), 45);
+        assert_eq!(part1(&TargetArea::from(&SAMPLE_INPUT)), 45);
+        assert_eq!(part1(&TargetArea::from(&SAMPLE_INPUT_2)), 66);
     }
 
     #[test]
     fn test_part2() {
-        let target = TargetArea::from(&SAMPLE_INPUT);
-        assert_eq!(part2(&target), 112);
+        assert_eq!(part2(&TargetArea::from(&SAMPLE_INPUT)), 112);
+        assert_eq!(part2(&TargetArea::from(&SAMPLE_INPUT_2)), 820);
     }
 }
