@@ -19,12 +19,30 @@ fn main() {
     assert!(res_p2 > 188);
 }
 
+fn get_min_sx(target: &TargetArea) -> i32 {
+    for v in 1.. {
+        let triangle = (v * (v + 1)) / 2;
+        if triangle > target.br_x {
+            return 0;
+        }
+
+        if triangle >= target.tl_x {
+            return v;
+        }
+    }
+
+    unreachable!();
+}
+
 fn part1(target: &TargetArea) -> i32 {
     let mut highest_y = 0;
+
+    let min_sx = get_min_sx(target);
+
     for sy in 1..-target.br_y {
         let mut found = None;
 
-        'loop_sx: for sx in 1..target.br_x {
+        'loop_sx: for sx in min_sx..=target.br_x {
             let mut vx = sx;
             let mut vy = sy;
             let mut x = 0;
@@ -77,9 +95,11 @@ fn part1(target: &TargetArea) -> i32 {
 
 fn part2(target: &TargetArea) -> usize {
     let mut count = 0;
+    
+    let min_sx = get_min_sx(target);
 
     for sy in target.br_y..-target.br_y {
-        for sx in 1..=target.br_x {
+        for sx in min_sx..=target.br_x {
             let mut vx = sx;
             let mut vy = sy;
             let mut x = 0;
