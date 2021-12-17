@@ -1,6 +1,6 @@
 use common::aoc::{print_result, run_many, print_time_cold};
 use common::grid::FixedGrid;
-use common::parser::{Parser, parse_uint};
+use common::parser;
 
 fn main() {
     let input = include_bytes!("../input/day13.txt");
@@ -80,27 +80,43 @@ enum Fold {
     Y(u32),
 }
 
+fn parse_point_line(input: &[u8]) -> Option<((u32, u32), &[u8])> {
+    let (x, input) = parser::uint(input)?;
+    let (_, input) = parser::expect_byte(input, b',')?;
+    let (y, input) = parser::uint(input)?;
+    let (_, input) = parser::rest_of_line(input)?;
+
+    Some(((x, y), input))
+}
+
+fn parse_fold_line(input: &[u8]) -> Option<(Fold, &[u8])> {
+    let (_, input) = parser::expect_bytes(input, b"fold along ")?;
+    let (axis, input) = parser::byte(input)?;
+    let (_, input) = parser::expect_byte(input, b'=')?;
+    let (pos, input) = parser::uint(input)?;
+    let (_, input) = parser::rest_of_line(input)?;
+
+    Some((match axis {
+        b'x' => Fold::X(pos),
+        b'y' => Fold::Y(pos),
+        _ => unreachable!(),
+    }, input))
+}
+
 fn parse_input(input: &[u8]) -> (Vec<(u32, u32)>, Vec<Fold>) {
     let mut points = Vec::with_capacity(64);
     let mut folds = Vec::with_capacity(32);
-    let mut parser = Parser::new(input).helper();
 
-    while let Some(x) = parser.uint(false) {
-        let y = parser.uint(true).unwrap();
-        points.push((x, y));
-        parser.skip_rest_of_line();
+    let mut input = input;
+    while let Some((point, remainder)) = parse_point_line(input) {
+        points.push(point);
+        input = remainder;
     }
 
-    parser.skip_rest_of_line();
-
-    while let Some(line) = parser.line() {
-        let (v, _) = parse_uint(&line[13..]).unwrap();
-
-        folds.push(match line[11] {
-            b'x' => Fold::X(v),
-            b'y' => Fold::Y(v),
-            _ => unreachable!(),
-        });
+    let (_, mut input) = parser::rest_of_line(input).unwrap();
+    while let Some((fold, remainder)) = parse_fold_line(input) {
+        folds.push(fold);
+        input = remainder;
     }
 
     (points, folds)

@@ -1,5 +1,5 @@
 use common::aoc::{print_result, run_many, print_time_cold};
-use common::parsers::{parse_i32s_amount};
+use common::parser;
 
 fn main() {
     let input = include_bytes!("../input/day17.txt");
@@ -131,10 +131,7 @@ fn part2(target: &TargetArea) -> usize {
 }
 
 fn parse_input(input: &[u8]) -> TargetArea {
-    let mut arr = [0i32; 4];
-    parse_i32s_amount(input, &mut arr, 4);
-
-    TargetArea::from(&arr)
+    TargetArea::parse(input).map(|(v, _)| v).unwrap()
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -189,6 +186,21 @@ impl TargetArea {
                 TargetStatus::Undershot
             }
         }
+    }
+
+    // target area: x=217..240, y=-126..-69
+    fn parse(input: &[u8]) -> Option<(TargetArea, &[u8])> {
+        let (_, input) = parser::expect_bytes(input, b"target area: x=")?;
+        let (tl_x, input) = parser::int(input)?;
+        let (_, input) = parser::expect_bytes(input, b"..")?;
+        let (br_x, input) = parser::int(input)?;
+        let (_, input) = parser::expect_bytes(input, b", y=")?;
+        let (br_y, input) = parser::int(input)?;
+        let (_, input) = parser::expect_bytes(input, b"..")?;
+        let (tl_y, input) = parser::int(input)?;
+        let (_, input) = parser::rest_of_line(input)?;
+
+        Some((TargetArea{tl_x, tl_y, br_x, br_y}, input))
     }
 }
 
