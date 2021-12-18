@@ -1,6 +1,6 @@
 use std::cmp::min;
 use num::Integer;
-use std::ops::Neg;
+use std::ops::{Neg, Shl};
 
 pub fn byte(data: &[u8]) -> Option<(u8, &[u8])> {
     if !data.is_empty() {
@@ -37,7 +37,7 @@ pub fn expect_string<'a, 'b>(data: &'a [u8], pred: &'b str) -> Option<((), &'a [
 
 pub fn rest_of_line(data: &[u8]) -> Option<(&[u8], &[u8])> {
     if data.is_empty() {
-        None
+        Some((data, data))
     } else {
         let len = data.iter().take_while(|v| **v != b'\n').count();
         Some((&data[..len], &data[len+1..]))
@@ -151,10 +151,49 @@ pub fn uint<T: Integer + Copy + From<u8>>(data: &[u8]) -> Option<(T, &[u8])> {
     Some((sum, &data[data.len()..]))
 }
 
+pub fn binary_uint<T: Integer + Shl<Output = T> + Copy>(data: &[u8]) -> Option<(T, &[u8])> {
+    if data.is_empty() {
+        return None;
+    }
+
+    let mut sum = T::zero();
+
+    for (i, b) in data.iter().enumerate() {
+        match *b {
+            b'0' => {
+                sum = sum.shl(T::one());
+                sum = sum.add(T::zero());
+            }
+            b'1' => {
+                sum = sum.shl(T::one());
+                sum = sum.add(T::one());
+            }
+            _ => {
+                return if i > 0 {
+                    Some((sum, &data[i..]))
+                } else {
+                    None
+                };
+            }
+        }
+    }
+
+    Some((sum, &data[data.len()..]))
+}
+
+pub fn word(data: &[u8]) -> Option<(&[u8], &[u8])> {
+    let len = data.iter().take_while(|b| **b != b' ').count();
+    if len > 0 {
+        Some((&data[..len], &data[min(len+1, data.len())..]))
+    } else {
+        None
+    }
+}
+
 pub fn line(data: &[u8]) -> Option<(&[u8], &[u8])> {
     let len = data.iter().take_while(|b| **b != b'\n').count();
     if len > 0 {
-        Some((&data[..len], &data[min(len, data.len())..]))
+        Some((&data[..len], &data[min(len+1, data.len())..]))
     } else {
         None
     }

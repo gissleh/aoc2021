@@ -208,12 +208,12 @@ impl TargetArea {
 mod tests {
     use super::*;
 
-    const SAMPLE_INPUT: [i32; 4] = [20, 30, -10, -5];
-    const SAMPLE_INPUT_2: [i32; 4] = [352, 377, -49, -30];
+    const SAMPLE_INPUT: &[u8] = b"target area: x=20..30, y=-10..-5\n";
+    const SAMPLE_INPUT_BIG1: &[u8] = b"target area: x=117..7310, y=-9546..-89\n";
 
     #[test]
     fn test_target_area() {
-        let ta = TargetArea::from(&SAMPLE_INPUT);
+        let ta = parse_input(&SAMPLE_INPUT);
 
         assert_eq!(ta.check(0, 0), TargetStatus::Undetermined);
         assert_eq!(ta.check(21, 3), TargetStatus::Undetermined);
@@ -225,13 +225,21 @@ mod tests {
 
     #[test]
     fn test_part1() {
-        assert_eq!(part1(&TargetArea::from(&SAMPLE_INPUT)), 45);
-        assert_eq!(part1(&TargetArea::from(&SAMPLE_INPUT_2)), 66);
+        assert_eq!(part1(&parse_input(&SAMPLE_INPUT)), 45);
     }
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(&TargetArea::from(&SAMPLE_INPUT)), 112);
-        assert_eq!(part2(&TargetArea::from(&SAMPLE_INPUT_2)), 820);
+        assert_eq!(part2(&parse_input(&SAMPLE_INPUT)), 112);
+    }
+
+    #[test]
+    fn test_part1_bigboy() {
+        assert_eq!(part1(&parse_input(&SAMPLE_INPUT_BIG1)), 45558285);
+    }
+
+    #[test]
+    fn test_part2_bigboy() {
+        assert_eq!(part1(&parse_input(&SAMPLE_INPUT_BIG1)), 69665558);
     }
 }
