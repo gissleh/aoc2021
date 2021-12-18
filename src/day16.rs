@@ -75,9 +75,9 @@ impl Packet {
             4 => {
                 let mut value = 0u64;
                 loop {
-                    let v = reader.read(5);
+                    let v: u64 = reader.read(5);
                     value <<= 4;
-                    value |= (v & 0b01111) as u64;
+                    value |= v & 0b01111;
 
                     if v & 0b10000 == 0 {
                         break;
@@ -89,7 +89,7 @@ impl Packet {
 
             _ => {
                 let mut subs = Vec::with_capacity(4);
-                let size_type = reader.read(1);
+                let size_type: u8 = reader.read(1);
                 if size_type == 1 {
                     let count = reader.read(11);
                     for _ in 0..count {
@@ -98,7 +98,7 @@ impl Packet {
                         reader.set_pos(new_pos);
                     }
                 } else {
-                    let total_size = reader.read(15) as usize;
+                    let total_size: usize = reader.read(15);
                     let target_pos = reader.pos() + total_size;
                     while reader.pos() < target_pos {
                         let (packet, new_pos) = Packet::parse(data, reader.pos());

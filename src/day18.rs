@@ -34,7 +34,7 @@ fn part2(input: &[SnailfishNumber]) -> u64 {
     let mut max_magnitude = 0;
 
     for i in 0..input.len() {
-        for j in (i+1)..input.len() {
+        for j in (i + 1)..input.len() {
             let mut acc_i = input[i].clone();
             let mut acc_j = input[j].clone();
 
@@ -719,6 +719,7 @@ mod tests {
     const SAMPLE_ADD_REDUCE_1_LEFT: &[u8] = b"[[[[4,3],4],4],[7,[[8,4],9]]]";
     const SAMPLE_ADD_REDUCE_1_RIGHT: &[u8] = b"[1,1]";
     const SAMPLE_ADD_REDUCE_1_EXPECTED: &[u8] = b"[[[[0,7],4],[[7,8],[6,0]]],[8,1]]";
+
     #[test]
     fn test_add_and_reduce_1() {
         let (mut acc, _) = SnailfishNumber::parse(SAMPLE_ADD_REDUCE_1_LEFT).unwrap();

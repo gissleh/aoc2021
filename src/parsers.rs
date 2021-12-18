@@ -1,4 +1,6 @@
 use std::cmp::min;
+use std::ops::{BitOrAssign, ShlAssign};
+use num::Integer;
 
 pub fn parse_u64(s: &str) -> u64 {
     let mut res = 0;
@@ -171,7 +173,6 @@ pub fn parse_i32s_amount(s: &[u8], dst: &mut [i32], amount: usize) -> usize {
     dst.len()
 }
 
-
 pub fn parse_u32_pair(s: &[u8]) -> (u32, u32) {
     let mut curr = 0;
     let mut active = false;
@@ -273,23 +274,19 @@ impl<'a> BitReader<'a> {
         self.pos
     }
 
-    pub fn read(&mut self, n: usize) -> u32 {
+    pub fn read<T: Integer + BitOrAssign + ShlAssign + Copy + From<u8>>(&mut self, n: usize) -> T {
         let mut remaining = n;
-        let mut res = 0;
+        let mut res = T::zero();
         while remaining > 0 {
             let i = self.pos / 8;
             let j = self.pos % 8;
             let read_size = min(remaining, 8 - j);
             let mask = BR_MASKS[read_size] >> j;
             let shift = 8 - j - read_size;
-            let value = ((self.data[i] & mask) >> shift) as u32;
+            let value = T::from((self.data[i] & mask) >> shift);
 
-            #[cfg(test)]
-            println!("remaining={} i={} j={} shift={} read_size={} mask={:b} = {}",
-                     remaining, i, j, shift, read_size, mask, value);
-
-            res <<= read_size;
-            res |= value;
+            res.shl_assign(T::from(read_size as u8));
+            res.bitor_assign(value);
 
             self.pos += read_size;
             remaining -= read_size;
@@ -312,17 +309,17 @@ mod tests {
         let data = vec![0xff, 0xff, 0x00, 0xab, 0xcf, 0x12, 0x34, 0xff, 0xa4, 0xf0];
         let mut reader = BitReader::new(&data, 0);
 
-        assert_eq!(reader.read(4), 0xf);
-        assert_eq!(reader.read(2), 0x3);
-        assert_eq!(reader.read(3), 0x7);
-        assert_eq!(reader.read(3), 0x7);
-        assert_eq!(reader.read(4), 0xf);
-        assert_eq!(reader.read(4), 0x0);
-        assert_eq!(reader.read(4), 0x0);
-        assert_eq!(reader.read(4), 0xa);
-        assert_eq!(reader.read(4), 0xb);
-        assert_eq!(reader.read(8), 0xcf);
-        assert_eq!(reader.read(16), 0x1234);
-        assert_eq!(reader.read(24), 0xffa4f0);
+        assert_eq!(reader.read::<u32>(4), 0xf);
+        assert_eq!(reader.read::<u32>(2), 0x3);
+        assert_eq!(reader.read::<u32>(3), 0x7);
+        assert_eq!(reader.read::<u32>(3), 0x7);
+        assert_eq!(reader.read::<u32>(4), 0xf);
+        assert_eq!(reader.read::<u32>(4), 0x0);
+        assert_eq!(reader.read::<u32>(4), 0x0);
+        assert_eq!(reader.read::<u32>(4), 0xa);
+        assert_eq!(reader.read::<u32>(4), 0xb);
+        assert_eq!(reader.read::<u32>(8), 0xcf);
+        assert_eq!(reader.read::<u32>(16), 0x1234);
+        assert_eq!(reader.read::<u32>(24), 0xffa4f0);
     }
 }
