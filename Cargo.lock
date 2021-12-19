@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "num",
+ "permutator",
  "radix-heap",
  "rustc-hash",
  "smallvec",
@@ -280,6 +281,15 @@ name = "numtoa"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
+
+[[package]]
+name = "permutator"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa5132833890643cdaeb330ae7cf7da92e0e11c8729f6f529140666213876a0b"
+dependencies = [
+ "num",
+]
 
 [[package]]
 name = "proc-macro2"
