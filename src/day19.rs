@@ -3,35 +3,7 @@ use num::integer::sqrt;
 use num::pow;
 use smallvec::{SmallVec};
 use common::aoc::{print_result, run_many, print_time_cold};
-use common::matrix::matrix_times_vector;
 use common::parser;
-
-const ROTATIONS: [[[i32; 3]; 3]; 24] = [
-    [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-    [[0, 0, -1], [0, -1, 0], [-1, 0, 0]],
-    [[0, 0, -1], [-1, 0, 0], [0, 1, 0]],
-    [[0, 0, -1], [1, 0, 0], [0, -1, 0]],
-    [[0, 0, -1], [0, 1, 0], [1, 0, 0]],
-    [[0, -1, 0], [0, 0, -1], [1, 0, 0]],
-    [[0, -1, 0], [-1, 0, 0], [0, 0, -1]],
-    [[0, -1, 0], [1, 0, 0], [0, 0, 1]],
-    [[0, -1, 0], [0, 0, 1], [-1, 0, 0]],
-    [[-1, 0, 0], [0, 0, -1], [0, -1, 0]],
-    [[-1, 0, 0], [0, -1, 0], [0, 0, 1]],
-    [[-1, 0, 0], [0, 1, 0], [0, 0, -1]],
-    [[-1, 0, 0], [0, 0, 1], [0, 1, 0]],
-    [[1, 0, 0], [0, 0, -1], [0, 1, 0]],
-    [[1, 0, 0], [0, -1, 0], [0, 0, -1]],
-    [[1, 0, 0], [0, 0, 1], [0, -1, 0]],
-    [[0, 1, 0], [0, 0, -1], [-1, 0, 0]],
-    [[0, 1, 0], [-1, 0, 0], [0, 0, 1]],
-    [[0, 1, 0], [1, 0, 0], [0, 0, -1]],
-    [[0, 1, 0], [0, 0, 1], [1, 0, 0]],
-    [[0, 0, 1], [0, -1, 0], [1, 0, 0]],
-    [[0, 0, 1], [-1, 0, 0], [0, -1, 0]],
-    [[0, 0, 1], [1, 0, 0], [0, 1, 0]],
-    [[0, 0, 1], [0, 1, 0], [-1, 0, 0]],
-];
 
 fn main() {
     let input = include_bytes!("../input/day19.txt");
@@ -229,12 +201,34 @@ struct Point(i32, i32, i32);
 
 impl Point {
     fn rotated(&self, orientation: usize) -> Point {
-        if orientation > 0 {
-            let vec = matrix_times_vector(ROTATIONS[orientation], [self.0, self.1, self.2]);
-            Point(vec[0], vec[1], vec[2])
-        } else {
-            // ORIENTATION_MATRICES[0] is the identity
-            *self
+        let Point(x, y, z) = *self;
+
+        match orientation {
+            0 => *self,
+            1 => Point(-z, -y, -x),
+            2 => Point(-z, -x, y),
+            3 => Point(-z, x, -y),
+            4 => Point(-z, y, x),
+            5 => Point(-y, -z, x),
+            6 => Point(-y, -x, -z),
+            7 => Point(-y, x, z),
+            8 => Point(-y, z, -x),
+            9 => Point(-x, -z, -y),
+            10 => Point(-x, -y, z),
+            11 => Point(-x, y, -z),
+            12 => Point(-x, z, y),
+            13 => Point(x, -z, y),
+            14 => Point(x, -y, -z),
+            15 => Point(x, z, -y),
+            16 => Point(y, -z, -x),
+            17 => Point(y, -x, z),
+            18 => Point(y, x, -z),
+            19 => Point(y, z, x),
+            20 => Point(z, -y, x),
+            21 => Point(z, -x, -y),
+            22 => Point(z, x, y),
+            23 => Point(z, y, -x),
+            _ => panic!("Invalid rotation {}", orientation),
         }
     }
 
