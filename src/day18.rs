@@ -4,11 +4,16 @@ use common::parser;
 use crate::SnailfishPairPart::{Number, Pair};
 
 fn main() {
-    let input = include_bytes!("../input/day18.txt");
+    let input_data = include_bytes!("../input/day18.txt");
 
-    let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input));
+    let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input_data));
+    let (input_sn2, dur_p_2, dur_pc_2) = run_many(1000, || parse_input_sn2(input_data));
     let (res_p1, dur_p1, dur_p1c) = run_many(100, || part1(&input));
+    let (res_p1_2, dur_p1_2, dur_p1c_2) = run_many(100, || part1_sn2(&input_sn2));
     let (res_p2, dur_p2, dur_p2c) = run_many(20, || part2(&input));
+    let (res_p2_2, dur_p2_2, dur_p2c_2) = run_many(100, || part2_sn2(&input_sn2));
+
+    println!("TREE");
 
     print_result("P1", res_p1);
     print_result("P2", res_p2);
@@ -17,6 +22,17 @@ fn main() {
     print_time_cold("P1", dur_p1, dur_p1c);
     print_time_cold("P2", dur_p2, dur_p2c);
     print_time_cold("Total", dur_p + dur_p1 + dur_p2, dur_pc + dur_p1c + dur_p2c);
+
+    println!();
+    println!("LINEAR");
+
+    print_result("P1", res_p1_2);
+    print_result("P2", res_p2_2);
+
+    print_time_cold("Parse", dur_p_2, dur_pc_2);
+    print_time_cold("P1", dur_p1_2, dur_p1c_2);
+    print_time_cold("P2", dur_p2_2, dur_p2c_2);
+    print_time_cold("Total", dur_p_2 + dur_p1_2 + dur_p2_2, dur_pc_2 + dur_p1c_2 + dur_p2c_2);
 }
 
 fn part1(input: &[SnailfishNumber]) -> u64 {
@@ -29,6 +45,18 @@ fn part1(input: &[SnailfishNumber]) -> u64 {
 
     acc.magnitude()
 }
+
+fn part1_sn2(input: &[SnailfishNumber2]) -> u64 {
+    let mut acc = input[0].clone();
+
+    for num in input.iter().skip(1) {
+        acc.add(&num);
+        acc.reduce();
+    }
+
+    acc.magnitude()
+}
+
 
 fn part2(input: &[SnailfishNumber]) -> u64 {
     let mut max_magnitude = 0;
@@ -59,6 +87,30 @@ fn part2(input: &[SnailfishNumber]) -> u64 {
     max_magnitude
 }
 
+fn part2_sn2(input: &[SnailfishNumber2]) -> u64 {
+    let mut max_magnitude = 0;
+
+    for i in 0..input.len() {
+        for j in 0..input.len() {
+            if i == j {
+                continue;
+            }
+
+            let mut acc = input[i].clone();
+
+            acc.add(&input[j]);
+            acc.reduce();
+
+            let magnitude = acc.magnitude();
+            if magnitude > max_magnitude {
+                max_magnitude = magnitude;
+            }
+        }
+    }
+
+    max_magnitude
+}
+
 fn parse_input(input: &[u8]) -> Vec<SnailfishNumber> {
     let mut res = Vec::with_capacity(16);
     let mut input = input;
@@ -68,6 +120,131 @@ fn parse_input(input: &[u8]) -> Vec<SnailfishNumber> {
     }
 
     res
+}
+
+fn parse_input_sn2(input: &[u8]) -> Vec<SnailfishNumber2> {
+    let mut res = Vec::with_capacity(16);
+    let mut input = input;
+    while let Some((number, new_input)) = SnailfishNumber2::parse(input) {
+        res.push(number);
+        input = new_input;
+    }
+
+    res
+}
+
+#[derive(Eq, PartialEq, Debug, Clone)]
+struct SnailfishNumber2 {
+    parts: SmallVec<[(u64, usize); 32]>,
+}
+
+impl SnailfishNumber2 {
+    fn explode(&mut self) -> bool {
+        for i in 0..self.parts.len() - 1 {
+            let (left, l_depth) = self.parts[i];
+            let (right, _) = self.parts[i + 1];
+
+            if l_depth == 4 {
+                if i > 0 {
+                    self.parts[i - 1].0 += left;
+                }
+                if i < self.parts.len() - 2 {
+                    self.parts[i + 2].0 += right;
+                }
+
+                self.parts.remove(i + 1);
+                self.parts[i] = (0, 3);
+
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn split(&mut self) -> bool {
+        for i in 0..self.parts.len() {
+            let (v, depth) = self.parts[i];
+
+            if v >= 10 {
+                let left = v / 2;
+                let right = left + v % 2;
+
+                self.parts[i] = (left, depth + 1);
+                self.parts.insert(i + 1, (right, depth + 1));
+
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn reduce(&mut self) {
+        loop {
+            if self.explode() {
+                continue;
+            }
+            if !self.split() {
+                break;
+            }
+        }
+    }
+
+    fn add(&mut self, rhs: &SnailfishNumber2) {
+        for (_, depth) in self.parts.iter_mut() {
+            *depth += 1;
+        }
+        for (value, depth) in rhs.parts.iter() {
+            self.parts.push((*value, *depth + 1));
+        }
+    }
+
+    fn magnitude(&self) -> u64 {
+        let mut sm = self.parts.clone();
+
+        while sm.len() > 1 {
+            for i in 0..sm.len() - 1 {
+                let (v1, d1) = sm[i];
+                let (v2, d2) = sm[i + 1];
+
+                if d1 == d2 {
+                    sm.remove(i + 1);
+                    sm[i] = ((v1 * 3) + (v2 * 2), d1 - 1);
+                    break;
+                }
+            }
+        }
+
+        sm[0].0
+    }
+
+    fn parse(mut input: &[u8]) -> Option<(SnailfishNumber2, &[u8])> {
+        let mut brackets = 0;
+        let mut parts: SmallVec<[(u64, usize); 32]> = SmallVec::new();
+
+        loop {
+            if let Some(((), remainder)) = parser::expect_byte(input, b'[') {
+                brackets += 1;
+                input = remainder;
+            } else if let Some(((), remainder)) = parser::expect_byte(input, b']') {
+                brackets -= 1;
+                input = remainder;
+            } else if let Some(((), remainder)) = parser::expect_byte(input, b',') {
+                input = remainder;
+            } else if let Some((value, remainder)) = parser::uint(input) {
+                parts.push((value, brackets - 1));
+                input = remainder;
+            } else {
+                return if parts.len() > 0 {
+                    let (_, input) = parser::rest_of_line(input)?;
+                    Some((SnailfishNumber2 { parts }, input))
+                } else {
+                    None
+                };
+            }
+        }
+    }
 }
 
 struct SnailfishNumberIterator<'a> {
@@ -829,6 +1006,189 @@ mod tests {
         let input2 = parse_input(SAMPLE_P1_2);
 
         assert_eq!(part2(&input2), 3993);
+    }
+
+    #[test]
+    fn test_sn2_explode() {
+        let (mut explode1, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_1_BEFORE).unwrap();
+        let (explode1_after, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_1_AFTER).unwrap();
+        let (mut explode2, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_2_BEFORE).unwrap();
+        let (explode2_after, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_2_AFTER).unwrap();
+        let (mut explode3, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_3_BEFORE).unwrap();
+        let (explode3_after, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_3_AFTER).unwrap();
+        let (mut explode4, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_4_BEFORE).unwrap();
+        let (explode4_after, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_4_AFTER).unwrap();
+        let (mut explode5, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_5_BEFORE).unwrap();
+        let (explode5_after, _) = SnailfishNumber2::parse(SAMPLE_EXPLODE_5_AFTER).unwrap();
+
+        explode1.reduce();
+        assert_eq!(explode1, explode1_after);
+
+        explode2.reduce();
+        assert_eq!(explode2, explode2_after);
+
+        explode3.reduce();
+        assert_eq!(explode3, explode3_after);
+
+        explode4.reduce();
+        assert_eq!(explode4, explode4_after);
+
+        explode5.reduce();
+        assert_eq!(explode5, explode5_after);
+    }
+
+    #[test]
+    fn test_sn2_parse() {
+        let input = SAMPLE_1;
+        let (num1, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num2, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num3, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num4, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num5, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num6, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num7, input) = SnailfishNumber2::parse(input).unwrap();
+        assert!(SnailfishNumber::parse(input).is_none());
+
+        assert_eq!(num1, SnailfishNumber2 {
+            parts: smallvec![
+                (1, 0), (2, 0)
+            ],
+        });
+
+        assert_eq!(num2, SnailfishNumber2 {
+            parts: smallvec![
+                (1, 1), (2, 1), (3, 0)
+            ],
+        });
+
+        assert_eq!(num3, SnailfishNumber2 {
+            parts: smallvec![
+                (9, 0), (8, 1), (7, 1)
+            ],
+        });
+
+        assert_eq!(num4, SnailfishNumber2 {
+            parts: smallvec![
+                (1, 1), (9, 1), (8, 1), (5,1)
+            ],
+        });
+
+        assert_eq!(num5, SnailfishNumber2 {
+            parts: smallvec![
+                (1, 3), (2, 3), (3, 3), (4, 3), (5, 3), (6, 3), (7, 3), (8, 3), (9, 0)
+            ],
+        });
+
+        assert_eq!(num6, SnailfishNumber2 {
+            parts: smallvec![
+                (9, 2), (3, 3), (8, 3), (0, 3), (9, 3), (6,2), (3, 3), (7,3), (4,3), (9,3), (3,1)
+            ],
+        });
+
+        assert_eq!(num7, SnailfishNumber2 {
+            parts: smallvec![
+                (1, 3), (3, 3), (5, 3), (3, 3), (1, 3), (3, 3),
+                (8, 3), (7, 3), (4, 3), (9, 3), (6, 3), (9, 3),
+                (8, 3), (2, 3), (7, 3), (3, 3),
+            ],
+        });
+    }
+
+    #[test]
+    fn test_sn2_add() {
+        let input = SAMPLE_1;
+        let (num1, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num2, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num3, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num4, _input) = SnailfishNumber2::parse(input).unwrap();
+
+        let mut num1_copy = num1.clone();
+        num1_copy.add(&num2);
+
+        let mut num3_copy = num3.clone();
+        num3_copy.add(&num4);
+
+        assert_eq!(num1_copy, SnailfishNumber2 {
+            parts: smallvec![
+                (1, 1), (2, 1), (1, 2), (2, 2), (3, 1)
+            ],
+        });
+
+        assert_eq!(num3_copy, SnailfishNumber2 {
+            parts: smallvec![
+                (9, 1), (8, 2), (7, 2), (1, 2), (9, 2), (8, 2), (5, 2)
+            ],
+        });
+    }
+
+    #[test]
+    fn test_sn2_reduce() {
+        let (mut test1, _) = SnailfishNumber2::parse(SAMPLE_REDUCE_START).unwrap();
+        let (test1_after, _) = SnailfishNumber2::parse(SAMPLE_REDUCE_END).unwrap();
+
+        test1.reduce();
+
+        assert_eq!(test1, test1_after);
+    }
+
+    #[test]
+    fn test_sn2_add_and_reduce() {
+        let input = SAMPLE_P1_1;
+        let (mut acc, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num1, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num2, input) = SnailfishNumber2::parse(input).unwrap();
+        let (num3, _input) = SnailfishNumber2::parse(input).unwrap();
+
+        let (expected1, _) = SnailfishNumber2::parse(SAMPLE_P1_1_RES_1).unwrap();
+        let (expected2, _) = SnailfishNumber2::parse(SAMPLE_P1_1_RES_2).unwrap();
+        let (expected3, _) = SnailfishNumber2::parse(SAMPLE_P1_1_RES_3).unwrap();
+
+        acc.add(&num1);
+        acc.reduce();
+        assert_eq!(acc, expected1);
+
+        acc.add(&num2);
+        acc.reduce();
+        assert_eq!(acc, expected2);
+
+        acc.add(&num3);
+        acc.reduce();
+        assert_eq!(acc, expected3);
+    }
+
+    #[test]
+    fn test_sn2_magnitude() {
+        let (test1, _) = SnailfishNumber2::parse(SAMPLE_MAGNITUDE_1).unwrap();
+        let (test2, _) = SnailfishNumber2::parse(SAMPLE_MAGNITUDE_2).unwrap();
+        let (test3, _) = SnailfishNumber2::parse(SAMPLE_MAGNITUDE_3).unwrap();
+        let (test4, _) = SnailfishNumber2::parse(SAMPLE_MAGNITUDE_4).unwrap();
+        let (test5, _) = SnailfishNumber2::parse(SAMPLE_MAGNITUDE_5).unwrap();
+        let (test6, _) = SnailfishNumber2::parse(SAMPLE_MAGNITUDE_6).unwrap();
+        let (test7, _) = SnailfishNumber2::parse(SAMPLE_MAGNITUDE_7).unwrap();
+
+        assert_eq!(test1.magnitude(), 143);
+        assert_eq!(test2.magnitude(), 1384);
+        assert_eq!(test3.magnitude(), 445);
+        assert_eq!(test4.magnitude(), 791);
+        assert_eq!(test5.magnitude(), 1137);
+        assert_eq!(test6.magnitude(), 3488);
+        assert_eq!(test7.magnitude(), 4140);
+    }
+
+    #[test]
+    fn test_sn2_part1() {
+        let input1 = parse_input_sn2(SAMPLE_P1_1);
+        let input2 = parse_input_sn2(SAMPLE_P1_2);
+
+        assert_eq!(part1_sn2(&input1), 3488);
+        assert_eq!(part1_sn2(&input2), 4140);
+    }
+
+    #[test]
+    fn test_sn2_part2() {
+        let input2 = parse_input_sn2(SAMPLE_P1_2);
+
+        assert_eq!(part2_sn2(&input2), 3993);
     }
 }
 
