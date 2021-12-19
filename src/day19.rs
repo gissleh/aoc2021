@@ -1,6 +1,7 @@
 use std::ops::{Add, Neg, Sub};
-use num::abs;
-use smallvec::{SmallVec, smallvec};
+use num::integer::sqrt;
+use num::pow;
+use smallvec::{SmallVec};
 use common::aoc::{print_result, run_many, print_time_cold};
 use common::matrix::matrix_times_vector;
 use common::parser;
@@ -36,7 +37,7 @@ fn main() {
     let input = include_bytes!("../input/day19.txt");
 
     let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input));
-    let ((res_p1, res_p2), dur_p1, dur_p1c) = run_many(1, || part1(&input));
+    let ((res_p1, res_p2), dur_p1, dur_p1c) = run_many(10, || part1(&input));
 
     print_result("P1", res_p1);
     print_result("P2", res_p2);
@@ -126,6 +127,7 @@ fn parse_input(input: &[u8]) -> Vec<Scanner> {
 struct Scanner {
     index: usize,
     points: Vec<Point>,
+    dists: Vec<i32>,
 }
 
 impl Scanner {
@@ -142,64 +144,35 @@ impl Scanner {
     fn find(&self, other: &Scanner) -> Option<(Point, usize)> {
         let mut rotated_points: SmallVec<[Point; 64]> = SmallVec::new();
 
-        let mut a_points: SmallVec<[Point; 16]> = SmallVec::new();
-        let mut b_points: SmallVec<[Point; 16]> = SmallVec::new();
-
-        let mut found_any = false;
-        'quick_check: for point in self.points.iter() {
-            for other_point in other.points.iter() {
-                let mut spent = [false; 32];
-                let try_diff = other_point.manhattan() - point.manhattan();
-                let mut count = 0;
-
-                a_points.clear();
-                b_points.clear();
-
-                for (i, a) in self.points.iter().enumerate() {
-                    for (j, b) in other.points.iter().enumerate() {
-                        if spent[j] {
-                            continue;
-                        }
-
-                        if b.manhattan() - a.manhattan() == try_diff {
-                            count += 1;
-                            spent[j] = true;
-
-                            a_points.push(self.points[i]);
-                            b_points.push(other.points[j]);
-
-                            break;
-                        }
-                    }
-                }
-
-                if count > 3 {
-                    println!("{}", count);
-                }
-                if count >= 12 {
-                    found_any = true;
-                    break 'quick_check;
+        let mut matches = 0;
+        'quick_check: for dist in self.dists.iter() {
+            for odist in other.dists.iter() {
+                if *dist == *odist {
+                    matches += 1;
                 }
             }
-        }
 
-        if !found_any {
+            if matches > 65 {
+                break 'quick_check;
+            }
+        }
+        if matches < 66 {
             return None;
         }
 
         for o in 0..24 {
             rotated_points.clear();
-            for p in b_points.iter() {
-                rotated_points.push(p.rotated(o));
+            for p in other.rotated_points(o) {
+                rotated_points.push(p);
             }
 
-            for point in a_points.iter() {
+            for point in self.points.iter() {
                 for other_point in rotated_points.iter() {
                     let mut spent = [false; 32];
                     let try_diff = *other_point - *point;
                     let mut count = 0;
 
-                    for (j, a) in a_points.iter().enumerate() {
+                    for a in self.points.iter() {
                         for (k, b) in rotated_points.iter().enumerate() {
                             if count >= 12 {
                                 break;
@@ -227,7 +200,7 @@ impl Scanner {
     }
 
     fn parse(input: &[u8]) -> Option<(Scanner, &[u8])> {
-        let mut points = Vec::with_capacity(64);
+        let mut points = Vec::with_capacity(32);
 
         let (_, input) = parser::expect_bytes(input, b"--- scanner ")?;
         let (index, input) = parser::uint(input)?;
@@ -240,7 +213,14 @@ impl Scanner {
 
         let (_, input) = parser::rest_of_line(input)?;
 
-        Some((Scanner { index, points }, input))
+        let mut dists = Vec::with_capacity((points.len() * (points.len() - 1)) / 2);
+        for i in 0..points.len() {
+            for j in (i + 1)..points.len() {
+                dists.push(points[i].distance(&points[j]));
+            }
+        }
+
+        Some((Scanner { index, points, dists }, input))
     }
 }
 
@@ -258,8 +238,12 @@ impl Point {
         }
     }
 
-    fn abs(&self) -> Point {
-        Point(self.0.abs(), self.1.abs(), self.2.abs())
+    fn distance(&self, rhs: &Point) -> i32 {
+        sqrt(
+            pow(self.0 - rhs.0, 2)
+                + pow(self.1 - rhs.1, 2)
+                + pow(self.2 - rhs.2, 2)
+        )
     }
 
     fn manhattan(&self) -> i32 {
@@ -304,22 +288,19 @@ impl Neg for Point {
 
 #[cfg(test)]
 mod tests {
-    use smallvec::smallvec;
     use super::*;
 
     #[test]
     fn test_parse_scanner() {
         let (scanner, _) = Scanner::parse(PARSE_SAMPLE).unwrap();
 
-        assert_eq!(scanner, Scanner {
-            index: 443,
-            points: vec![
-                Point(404, -588, -901),
-                Point(528, -643, 409),
-                Point(-838, 591, 734),
-                Point(390, -675, -793),
-            ],
-        })
+        assert_eq!(scanner.index, 443);
+        assert_eq!(scanner.points, vec![
+            Point(404, -588, -901),
+            Point(528, -643, 409),
+            Point(-838, 591, 734),
+            Point(390, -675, -793),
+        ]);
     }
 
     #[test]
