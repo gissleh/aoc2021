@@ -1,9 +1,9 @@
 use std::ops::{Add, Neg, Sub};
 use num::integer::sqrt;
 use num::pow;
-use smallvec::{SmallVec};
 use common::aoc::{print_result, run_many, print_time_cold};
 use common::parser;
+use smallvec::SmallVec;
 
 fn main() {
     let input = include_bytes!("../input/day19.txt");
@@ -98,15 +98,11 @@ fn parse_input(input: &[u8]) -> Vec<Scanner> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 struct Scanner {
     index: usize,
-    points: Vec<Point>,
-    dists: Vec<i32>,
+    points: SmallVec<[Point; 64]>,
+    fingerprints: Vec<(i32, usize, usize)>,
 }
 
 impl Scanner {
-    fn rotated_points<'a>(&'a self, o: usize) -> impl Iterator<Item=Point> + 'a {
-        self.points.iter().copied().map(move |p| p.rotated(o))
-    }
-
     fn rotate(&mut self, orientation: usize) {
         for p in self.points.iter_mut() {
             *p = p.rotated(orientation);
@@ -114,55 +110,21 @@ impl Scanner {
     }
 
     fn find(&self, other: &Scanner) -> Option<(Point, usize)> {
-        let mut rotated_points: SmallVec<[Point; 64]> = SmallVec::new();
+        for (afp, ai, aj) in self.fingerprints.iter() {
+            for (bfp, bi, bj) in other.fingerprints.iter() {
+                if afp == bfp {
+                    let a_points = [self.points[*ai], self.points[*aj]];
+                    let b_points = [other.points[*bi], other.points[*bj]];
 
-        let mut matches = 0;
-        'quick_check: for dist in self.dists.iter() {
-            for odist in other.dists.iter() {
-                if *dist == *odist {
-                    matches += 1;
-                }
-            }
+                    for o in 0..24 {
+                        let b_points = [b_points[0].rotated(o), b_points[1].rotated(o)];
 
-            if matches > 65 {
-                break 'quick_check;
-            }
-        }
-        if matches < 66 {
-            return None;
-        }
+                        let l_diff = a_points[0] - b_points[0];
+                        let r_diff = a_points[1] - b_points[1];
 
-        for o in 0..24 {
-            rotated_points.clear();
-            for p in other.rotated_points(o) {
-                rotated_points.push(p);
-            }
-
-            for point in self.points.iter() {
-                for other_point in rotated_points.iter() {
-                    let mut spent = [false; 32];
-                    let try_diff = *other_point - *point;
-                    let mut count = 0;
-
-                    for a in self.points.iter() {
-                        for (k, b) in rotated_points.iter().enumerate() {
-                            if count >= 12 {
-                                break;
-                            }
-                            if spent[k] {
-                                continue;
-                            }
-
-                            if *b - *a == try_diff {
-                                count += 1;
-                                spent[k] = true;
-                                break;
-                            }
+                        if l_diff == r_diff {
+                            return Some((l_diff, o));
                         }
-                    }
-
-                    if count >= 12 {
-                        return Some((-try_diff, o));
                     }
                 }
             }
@@ -172,7 +134,7 @@ impl Scanner {
     }
 
     fn parse(input: &[u8]) -> Option<(Scanner, &[u8])> {
-        let mut points = Vec::with_capacity(32);
+        let mut points: SmallVec<[Point; 64]> = SmallVec::new();
 
         let (_, input) = parser::expect_bytes(input, b"--- scanner ")?;
         let (index, input) = parser::uint(input)?;
@@ -185,14 +147,18 @@ impl Scanner {
 
         let (_, input) = parser::rest_of_line(input)?;
 
-        let mut dists = Vec::with_capacity((points.len() * (points.len() - 1)) / 2);
+        let mut fingerprints = Vec::with_capacity((points.len() * (points.len() - 1)) / 2);
         for i in 0..points.len() {
             for j in (i + 1)..points.len() {
-                dists.push(points[i].distance(&points[j]));
+                fingerprints.push((
+                    points[i].distance(&points[j]),
+                    i,
+                    j,
+                ));
             }
         }
 
-        Some((Scanner { index, points, dists }, input))
+        Some((Scanner { index, points, fingerprints }, input))
     }
 }
 
@@ -234,9 +200,9 @@ impl Point {
 
     fn distance(&self, rhs: &Point) -> i32 {
         sqrt(
-            pow(self.0 - rhs.0, 2)
-                + pow(self.1 - rhs.1, 2)
-                + pow(self.2 - rhs.2, 2)
+            pow(rhs.0 - self.0, 2)
+                + pow(rhs.1 - self.1, 2)
+                + pow(rhs.2 - self.2, 2)
         )
     }
 
@@ -289,7 +255,7 @@ mod tests {
         let (scanner, _) = Scanner::parse(PARSE_SAMPLE).unwrap();
 
         assert_eq!(scanner.index, 443);
-        assert_eq!(scanner.points, vec![
+        assert_eq!(scanner.points.as_slice(), &[
             Point(404, -588, -901),
             Point(528, -643, 409),
             Point(-838, 591, 734),
