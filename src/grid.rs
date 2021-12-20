@@ -160,7 +160,7 @@ impl<T> FixedGrid<T>
 
 impl<T> FixedGrid<T>
     where
-        T: Clone + Copy,
+        T: Copy,
 {
     pub fn set(&mut self, x: usize, y: usize, v: T) {
         self.data[y * self.width + x] = v;
@@ -179,6 +179,22 @@ impl<T> FixedGrid<T>
         assert_eq!(self.width, other.width);
         assert_eq!(self.height, other.height);
         self.data.copy_from_slice(&other.data);
+    }
+
+    pub fn blit(&mut self, source: &FixedGrid<T>, x: usize, y: usize) {
+        let x2 = x + source.width;
+        if x2 > self.width {
+            panic!("Copy falls outside grid x2({}) > x({})", x2, self.width)
+        }
+        let y2 = y + source.height;
+        if y2 > self.height {
+            panic!("Copy falls outside grid y2({}) > y({})", y2, self.height)
+        }
+
+        for (i, line) in source.lines().enumerate() {
+            let target_line = self.get_slice_mut(x, x2, y + i);
+            target_line.copy_from_slice(line);
+        }
     }
 
     pub fn new(width: usize, height: usize, def: T) -> FixedGrid<T> {
@@ -215,11 +231,17 @@ impl<T> FixedGrid<T>
         count
     }
 
+    #[inline]
     pub fn has(&self, x: usize, y: usize, v: T) -> bool {
+        self.has_oob(x, y, v, false)
+    }
+
+    #[inline]
+    pub fn has_oob(&self, x: usize, y: usize, v: T, oob: bool) -> bool {
         if x >= self.width {
-            false
+            oob
         } else if y >= self.height {
-            false
+            oob
         } else {
             self.data[(y * self.width) + x] == v
         }
