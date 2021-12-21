@@ -58,6 +58,11 @@ fn part2(input: &[u32; 2]) -> u64 {
     max(p1_wins, p2_wins)
 }
 
+const WEIGHTS: [u64; 10] = [
+    0, 0, 0, 1, 3,
+    6, 7, 6, 3, 1,
+];
+
 fn calculate_universes(positions: [u32; 2], scores: [u32; 2], turn: u32, cache: &mut [Option<(u64, u64)>]) -> (u64, u64) {
     let key = cache_key(&positions, &scores, turn);
 
@@ -68,27 +73,23 @@ fn calculate_universes(positions: [u32; 2], scores: [u32; 2], turn: u32, cache: 
         let ti = turn as usize;
         let next_turn = (turn + 1) % 2;
 
-        for d1 in 1..=3 {
-            for d2 in 1..=3 {
-                for d3 in 1..=3 {
-                    let mut new_scores = scores;
-                    let mut new_positions = positions;
-                    let dice = d1 + d2 + d3;
+        for dice in 3..10 {
+            let weight = WEIGHTS[dice as usize];
+            let mut new_scores = scores;
+            let mut new_positions = positions;
 
-                    new_positions[ti] = (new_positions[ti] + dice) % 10;
-                    new_scores[ti] += new_positions[ti] + 1;
-                    if new_scores[ti] >= 21 {
-                        if turn == 0 {
-                            sum.0 += 1;
-                        } else {
-                            sum.1 += 1;
-                        }
-                    } else {
-                        let sum2 = calculate_universes(new_positions, new_scores, next_turn, cache);
-                        sum.0 += sum2.0;
-                        sum.1 += sum2.1;
-                    }
+            new_positions[ti] = (new_positions[ti] + dice) % 10;
+            new_scores[ti] += new_positions[ti] + 1;
+            if new_scores[ti] >= 21 {
+                if turn == 0 {
+                    sum.0 += weight;
+                } else {
+                    sum.1 += weight;
                 }
+            } else {
+                let sum2 = calculate_universes(new_positions, new_scores, next_turn, cache);
+                sum.0 += sum2.0 * weight;
+                sum.1 += sum2.1 * weight;
             }
         }
 
