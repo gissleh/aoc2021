@@ -1,5 +1,5 @@
 use smallvec::{SmallVec, smallvec};
-use std::cmp::Ordering;
+use std::cmp::{max, min, Ordering};
 use std::ops::{Add, Sub, Mul};
 
 const SUB_EDGES: [Cube; 8] = [
@@ -15,14 +15,26 @@ const SUB_EDGES: [Cube; 8] = [
 
 const SUB_CENTERS: [Point; 8] = [
     Point(-1, -1, -1),
+    Point(1, -1, -1),
+    Point(-1, 1, -1),
+    Point(1, 1, -1),
+    Point(-1, -1, 1),
+    Point(1, -1, 1),
+    Point(-1, 1, 1),
+    Point(1, 1, 1),
+];
+
+const SUB_CENTERS2: [Point; 8] = [
+    Point(-1, -1, -1),
     Point(0, -1, -1),
     Point(-1, 0, -1),
     Point(0, 0, -1),
-    Point(0, 0, 1),
-    Point(1, 0, 1),
-    Point(0, 1, 1),
-    Point(1, 1, 1),
+    Point(-1, -1, 0),
+    Point(0, -1, 0),
+    Point(-1, 0, 0),
+    Point(0, 0, 0),
 ];
+
 
 // -z, -y, -x = 000
 // -z, -y, x = 001
@@ -54,10 +66,10 @@ pub struct Batch<T> {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Point(isize, isize, isize);
+pub struct Point(pub isize, pub isize, pub isize);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Cube(Point, Point);
+pub struct Cube(pub Point, pub Point);
 
 impl<T> Octree<T> where T: Copy + std::cmp::PartialEq {
     pub fn get(&self, p: Point) -> Option<T> {
@@ -79,42 +91,39 @@ impl<T> Octree<T> where T: Copy + std::cmp::PartialEq {
         loop {
             match self.octants[index].set(p, v) {
                 Ok(_) => {
+                    self.free_sub_octants(index);
+                    self.octants[index].subs = [0; 8];
                     break;
                 }
                 Err(sub_index) => {
-                    if self.octants[index].subs[sub_index] == 0 {
-                        // Collect data from current.
-                        let old_value = self.octants[index].value;
-                        let new_factor = self.octants[index].factor >> 1;
-                        let new_center = self.octants[index].sub_center(sub_index);
+                    // If the octant is a leaf and has the value V already, stop here.
+                    if self.octants[index].value == v && self.octants[index].subs.iter().find(|v| **v > 0).is_none() {
+                        break;
+                    }
 
-                        // No need to create a more specific if the value here is exact.
-                        if old_value == v {
-                            return;
-                        }
+                    index = self.ensure_octant(index, sub_index);
+                }
+            }
+        }
+    }
 
-                        // Move on to new octant
-                        if let Some(free_index) = self.free_list.pop() {
-                            self.octants[index].subs[sub_index] = free_index;
-                            index = free_index;
+    pub fn set_cube(&mut self, c: Cube, v: Option<T>) {
+        let mut stack: SmallVec<[usize; 8]> = SmallVec::new();
+        stack.push(0);
+        while let Some(index) = stack.pop() {
+            match self.octants[index].set_cube(c, v) {
+                Ok(_) => {
+                    self.free_sub_octants(index);
+                    self.octants[index].subs = [0; 8];
+                }
+                Err(sub_indices) => {
+                    // If the octant is a leaf and has the value V already, stop here.
+                    if self.octants[index].value == v && self.octants[index].subs.iter().find(|v| **v > 0).is_none() {
+                        continue;
+                    }
 
-                            // Populate new octant.
-                            self.octants[index].subs = [0; 8];
-                            self.octants[index].value = old_value;
-                            self.octants[index].center = new_center;
-                            self.octants[index].factor = new_factor;
-                        } else {
-                            self.octants[index].subs[sub_index] = self.octants.len();
-                            index = self.octants.len();
-                            self.octants.push(Octant {
-                                value: old_value,
-                                subs: [0; 8],
-                                factor: new_factor,
-                                center: new_center,
-                            });
-                        }
-                    } else {
-                        index = self.octants[index].subs[sub_index];
+                    for sub_index in sub_indices {
+                        stack.push(self.ensure_octant(index, sub_index));
                     }
                 }
             }
@@ -131,14 +140,53 @@ impl<T> Octree<T> where T: Copy + std::cmp::PartialEq {
 
             if let Some(v) = &octant.value {
                 if callback(v) {
-                    count += octant.cube().volume() as usize
+                    count += octant.value_weight();
                 }
-            } else {
-                stack.extend(octant.subs.iter().copied().filter(|v| *v > 0));
+            }
+
+            for sub in octant.subs {
+                if sub > 0 {
+                    stack.push(sub);
+                }
             }
         }
 
         count
+    }
+
+    fn ensure_octant(&mut self, index: usize, sub_index: usize) -> usize {
+        if self.octants[index].subs[sub_index] == 0 {
+            // Collect data from current.
+            let old_value = self.octants[index].value;
+            let new_factor = self.octants[index].factor >> 1;
+            let new_center = self.octants[index].sub_center(sub_index);
+
+            // Move on to new octant
+            if let Some(free_index) = self.free_list.pop() {
+                self.octants[index].subs[sub_index] = free_index;
+
+                // Populate new octant.
+                let new_index = free_index;
+                self.octants[new_index].subs = [0; 8];
+                self.octants[new_index].value = old_value;
+                self.octants[new_index].factor = new_factor;
+                self.octants[new_index].center = new_center;
+
+                new_index
+            } else {
+                self.octants[index].subs[sub_index] = self.octants.len();
+                self.octants.push(Octant {
+                    value: old_value,
+                    subs: [0; 8],
+                    factor: new_factor,
+                    center: new_center,
+                });
+
+                self.octants.len() - 1
+            }
+        } else {
+            self.octants[index].subs[sub_index]
+        }
     }
 
     /// Free an octant and all its children. This assumes no octant is pointed at it.
@@ -175,6 +223,18 @@ impl<T> Octant<T> where T: Copy + std::cmp::PartialEq {
             | if p.z() < self.center.z() { 0 } else { 4 })
     }
 
+    fn set_cube(&mut self, c: Cube, value: Option<T>) -> Result<(), SmallVec<[usize; 8]>> {
+        match self.check_coverage(&c) {
+            Ok(_) => {
+                self.value = value;
+                Ok(())
+            }
+            Err(subs) => {
+                Err(subs)
+            }
+        }
+    }
+
     fn set(&mut self, p: Point, value: Option<T>) -> Result<(), usize> {
         if self.factor > 0 {
             Err(self.sub_index(p))
@@ -198,6 +258,16 @@ impl<T> Octant<T> where T: Copy + std::cmp::PartialEq {
         }
     }
 
+    /// Get the weight of the value, which is the volume of all non-sub values.
+    fn value_weight(&self) -> usize {
+        if self.factor == 0 {
+            1
+        } else {
+            let sub_weight = (self.factor.pow(3)) as usize;
+            sub_weight * self.subs.iter().filter(|v| **v == 0).count()
+        }
+    }
+
     fn cube(&self) -> Cube {
         let fac_point = Point(self.factor, self.factor, self.factor);
         let min = self.center - fac_point;
@@ -206,7 +276,12 @@ impl<T> Octant<T> where T: Copy + std::cmp::PartialEq {
     }
 
     fn sub_center(&self, idx: usize) -> Point {
-        let offset = Point(self.factor >> 1, self.factor >> 1, self.factor >> 1) * SUB_CENTERS[idx];
+        let offset = if self.factor > 1 {
+            SUB_CENTERS[idx] * Point(self.factor >> 1, self.factor >> 1, self.factor >> 1)
+        } else {
+            SUB_CENTERS2[idx]
+        };
+
         self.center + offset
     }
 
@@ -221,8 +296,8 @@ impl<T> Octant<T> where T: Copy + std::cmp::PartialEq {
 
     /// covered_by returns true if the entire octant is covered by this cube. Otherwise, it returns
     /// a list of up to 8 local indices that are **fully or partially** covered.
-    fn covered_by(&self, cube: &Cube) -> Result<(), SmallVec<[usize; 8]>> {
-        if self.factor == 1 {
+    fn check_coverage(&self, cube: &Cube) -> Result<(), SmallVec<[usize; 8]>> {
+        if self.factor == 0 {
             // The atom octant holds only the value at its center.
             if self.center.inside_cube(&cube) {
                 Ok(())
@@ -267,8 +342,15 @@ impl Point {
     fn inside_cube(&self, cube: &Cube) -> bool {
         let Cube(min, max) = cube;
 
-        self.x() >= min.x() && self.y() >= min.y() && self.x() >= min.z()
-            && self.x() < max.x() && self.y() < max.y() && self.x() < max.z()
+        self.x() >= min.x() && self.y() >= min.y() && self.z() >= min.z()
+            && self.x() < max.x() && self.y() < max.y() && self.z() < max.z()
+    }
+
+    fn inside_cube_max(&self, cube: &Cube) -> bool {
+        let Cube(min, max) = cube;
+
+        self.x() >= min.x() && self.y() >= min.y() && self.z() >= min.z()
+            && self.x() <= max.x() && self.y() <= max.y() && self.z() <= max.z()
     }
 }
 
@@ -312,8 +394,30 @@ impl Cube {
             * (self.1.2 - self.0.2)
     }
 
+    pub fn constrained(&self, other: &Cube) -> Option<Cube> {
+        let Cube(s_min, s_max) = self;
+        let Cube(o_min, o_max) = other;
+
+        if self.overlaps(other) {
+            Some(Cube(
+                Point(
+                    max(s_min.0, o_min.0),
+                    max(s_min.1, o_min.1),
+                    max(s_min.2, o_min.2),
+                ),
+                Point(
+                    min(s_max.0, o_max.0),
+                    min(s_max.1, o_max.1),
+                    min(s_max.2, o_max.2),
+                ),
+            ))
+        } else {
+            None
+        }
+    }
+
     fn contained_by(&self, other: &Cube) -> bool {
-        self.0.inside_cube(other) && self.1.inside_cube(other)
+        self.0.inside_cube(other) && self.1.inside_cube_max(other)
     }
 }
 
@@ -322,114 +426,134 @@ mod tests {
     use super::*;
 
     #[test]
-    fn set_works() {
+    fn centers_are_correct() {
+        let a = Octant::<()> { center: Point(4, 4, 4), factor: 4, subs: [0; 8], value: None };
+        let b = Octant::<()> { center: Point(4, 4, 4), factor: 4, subs: [0; 8], value: None };
+
+        assert_eq!(a.sub_center(7), Point(6, 6, 6));
+    }
+
+    #[test]
+    fn can_set_single_value() {
         let mut octree = Octree::new(16);
 
         octree.set(Point(-3, -9, -12), Some(64));
-        octree.set(Point(-1, -1, -1), Some(572));
-        octree.set(Point(-1, -1, -2), Some(772));
-        octree.set(Point(0, 0, 0), Some(0));
-        octree.set(Point(4, 3, 1), None);
-        octree.set(Point(0, 0, 0), None);
-
-        println!("{:#?}", octree);
 
         assert_eq!(octree, Octree::<i32> {
             octants: vec![Octant {
                 value: None,
                 factor: 16,
                 center: Point(0, 0, 0),
-                subs: [1, 0, 0, 0, 0, 0, 0, 11],
+                subs: [1, 0, 0, 0, 0, 0, 0, 0],
             }, Octant {
                 value: None,
                 factor: 8,
                 center: Point(-8, -8, -8),
-                subs: [0, 2, 0, 0, 0, 0, 0, 6],
+                subs: [0, 2, 0, 0, 0, 0, 0, 0],
             }, Octant {
                 value: None,
                 factor: 4,
-                center: Point(-8, -12, -12),
+                center: Point(-4, -12, -12),
                 subs: [0, 0, 0, 0, 0, 0, 0, 3],
             }, Octant {
                 value: None,
                 factor: 2,
-                center: Point(-6, -10, -10),
-                subs: [0, 0, 0, 4, 0, 0, 0, 0],
+                center: Point(-2, -10, -10),
+                subs: [0, 0, 4, 0, 0, 0, 0, 0],
             }, Octant {
                 value: None,
                 factor: 1,
-                center:
-                Point(-6, -10, -11),
+                center: Point(-3, -9, -11),
                 subs: [0, 0, 0, 5, 0, 0, 0, 0],
             }, Octant {
                 value: Some(64),
                 factor: 0,
-                center:
-                Point(-6, -10, -11),
-                subs: [0, 0, 0, 0, 0, 0, 0, 0],
-            }, Octant {
-                value: None,
-                factor: 4,
-                center:
-                Point(-4, -4, -4),
-                subs: [0, 0, 0, 0, 0, 0, 0, 7],
-            }, Octant {
-                value: None,
-                factor: 2,
-                center:
-                Point(-2, -2, -2),
-                subs: [0, 0, 0, 0, 0, 0, 0, 8],
-            }, Octant {
-                value: None,
-                factor: 1,
-                center:
-                Point(-1, -1, -1),
-                subs: [0, 0, 0, 10, 0, 0, 0, 9],
-            }, Octant {
-                value: Some(572),
-                factor: 0,
-                center: Point(-1, -1, -1),
-                subs: [0, 0, 0, 0, 0, 0, 0, 0],
-            }, Octant {
-                value: Some(772),
-                factor: 0,
-                center: Point(-1, -1, -1),
-                subs: [0, 0, 0, 0, 0, 0, 0, 0],
-            }, Octant {
-                value: None,
-                factor: 0,
-                center: Point(8, 8, 8),
-                subs: [12, 0, 0, 0, 0, 0, 0, 0],
-            }, Octant {
-                value: None,
-                factor: 0,
-                center: Point(4, 4, 4),
-                subs: [13, 0, 0, 0, 0, 0, 0, 0],
-            }, Octant {
-                value: None,
-                factor: 0,
-                center: Point(2, 2, 2),
-                subs: [14, 0, 0, 0, 0, 0, 0, 0],
-            }, Octant {
-                value: None,
-                factor: 0,
-                center: Point(1, 1, 1),
-                subs: [15, 0, 0, 0, 0, 0, 0, 0],
-            }, Octant {
-                value: None,
-                factor: 0,
-                center: Point(0, 0, 0),
+                center: Point(-3, -9, -12),
                 subs: [0, 0, 0, 0, 0, 0, 0, 0],
             }],
             free_list: vec![],
         });
+    }
 
-        assert_eq!(octree.get(Point(-3, -9, -12)), Some(64));
-        assert_eq!(octree.get(Point(-1, -1, -1)), Some(572));
-        assert_eq!(octree.get(Point(-1, -1, -2)), Some(772));
-        assert_eq!(octree.get(Point(-1, -1, -3)), None);
-        assert_eq!(octree.get(Point(-1123, -166, -33)), None);
-        assert_eq!(octree.get(Point(0, 0, 0)), None);
-        assert_eq!(octree.get(Point(1,3,2)), None);
+    #[test]
+    fn count_counts_singles() {
+        let mut octree = Octree::new(16);
+
+        octree.set(Point(-3, -9, -12), Some(64));
+        octree.set(Point(-1, -1, -1), Some(66));
+        octree.set(Point(-1, -1, -2), Some(57));
+        octree.set(Point(-3, 9, -12), Some(66));
+        octree.set(Point(-3, 9, -11), Some(65));
+        octree.set(Point(-3, 9, -11), Some(65));
+        octree.set(Point(-1, -1, -2), Some(62));
+        octree.set(Point(0, 0, 0), Some(0));
+
+        assert_eq!(octree.count(|v| *v >= 60 && *v < 70), 5);
+    }
+
+    #[test]
+    fn can_poke_hole_and_count_correctly() {
+        // Cube 0,0,0 to 16,16,16
+        let mut octy = Octree::<i32> {
+            octants: vec![Octant {
+                value: None,
+                factor: 16,
+                center: Point(0, 0, 0),
+                subs: [0, 0, 0, 0, 0, 0, 0, 1],
+            }, Octant {
+                value: Some(64),
+                factor: 8,
+                center: Point(8, 8, 8),
+                subs: [0, 0, 0, 0, 0, 0, 0, 0],
+            }],
+            free_list: vec![],
+        };
+
+        assert_eq!(octy.count(|v| *v == 64), 4096);
+        octy.set(Point(1, 2, 3), None);
+        assert_eq!(octy.count(|v| *v == 64), 4095);
+        octy.set(Point(1, 2, 3), None);
+        assert_eq!(octy.count(|v| *v == 64), 4095);
+        octy.set(Point(6, 7, 4), None);
+        assert_eq!(octy.count(|v| *v == 64), 4094);
+    }
+
+    #[test]
+    fn thin_bois_work() {
+        let mut octy = Octree::new(16);
+        octy.set_cube(Cube(
+            Point(1, 2, 3),
+            Point(1, 2, 33),
+        ), Some(30));
+
+        assert_eq!(octy.count(|_| true), 30);
+    }
+
+    #[test]
+    fn can_set_cubes() {
+        for x in -8..2 {
+            for y in -4..3 {
+                for z in -3..1 {
+                    let mut ot = Octree::new(16);
+                    ot.set_cube(
+                        Cube(
+                            Point(x, y, z),
+                            Point(x + 8, y + 8, z + 8),
+                        ),
+                        Some(32),
+                    );
+
+                    ot.set_cube(
+                        Cube(
+                            Point(x + 4, y + 4, z + 4),
+                            Point(x + 10, y + 10, z + 10),
+                        ),
+                        None,
+                    );
+
+                    assert_eq!(ot.count(|_| true), 448);
+                }
+            }
+        }
     }
 }
