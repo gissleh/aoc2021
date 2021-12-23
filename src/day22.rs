@@ -1,3 +1,5 @@
+use std::cmp::{max, min};
+use std::mem::swap;
 use common::aoc::{print_result, run_many, print_time_cold};
 use common::octree::{Cube, Octree, Point};
 use common::parser;
@@ -8,19 +10,53 @@ fn main() {
     let input = include_bytes!("../input/day22.txt");
 
     let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input));
-    let (res_p1, dur_p1, dur_p1c) = run_many(10, || part1(&input));
-    let (res_p2, dur_p2, dur_p2c) = run_many(1, || part2(&input));
+    let (res_p1, dur_p1, dur_p1c) = run_many(100, || part1_octree(&input));
+    let (res_p1_c, dur_p1_c, dur_p1c_c) = run_many(100, || part1_cubes(&input));
+    //let (res_p2, dur_p2, dur_p2c) = run_many(1, || part2_octree(&input));
+    let (res_p2_c, dur_p2_c, dur_p2c_c) = run_many(100, || part2_cubes(&input));
 
-    print_result("P1", res_p1);
-    print_result("P2", res_p2);
+    print_result("P1 (Octree)", res_p1);
+    print_result("P1 (Cubes)", res_p1_c);
+    //print_result("P2 (Octree)", res_p2);
+    print_result("P2 (Cubes)", res_p2_c);
 
     print_time_cold("Parse", dur_p, dur_pc);
-    print_time_cold("P1", dur_p1, dur_p1c);
-    print_time_cold("P2", dur_p2, dur_p2c);
-    print_time_cold("Total", dur_p + dur_p1 + dur_p2, dur_pc + dur_p1c + dur_p2c);
+    print_time_cold("P1 (Octree)", dur_p1, dur_p1c);
+    print_time_cold("P1 (Cubes)", dur_p1_c, dur_p1c_c);
+    //print_time_cold("P2 (Octree)", dur_p2, dur_p2c);
+    print_time_cold("P2 (Cubes)", dur_p2_c, dur_p2c_c);
+    //print_time_cold("Total", dur_p + dur_p1 + dur_p2, dur_pc + dur_p1c + dur_p2c);
 }
 
-fn part1(input: &[Line]) -> usize {
+fn part1_cubes(input: &[Line]) -> i64 {
+    let mut cubes: Vec<Cuboid> = Vec::with_capacity(1024);
+    let mut next_cubes: Vec<Cuboid> = Vec::with_capacity(1024);
+
+    let constraint = Cuboid {
+        min: CuboidPoint([-50, -50, -50]),
+        max: CuboidPoint([51, 51, 51]),
+    };
+
+    for Line(toggle, cube) in input.iter() {
+        if let Some(cube) = cube.constrained(&constraint) {
+            next_cubes.clear();
+
+            for c in cubes.iter() {
+                next_cubes.extend_from_slice(&c.subtract(&cube));
+            }
+
+            if let Toggle::On = toggle {
+                next_cubes.push(cube);
+            }
+
+            swap(&mut cubes, &mut next_cubes)
+        }
+    }
+
+    cubes.iter().map(|c| c.volume()).sum()
+}
+
+fn part1_octree(input: &[Line]) -> usize {
     let constraint = Cube(
         Point(-50, -50, -50),
         Point(51, 51, 51),
@@ -29,7 +65,7 @@ fn part1(input: &[Line]) -> usize {
     let mut octy = Octree::new(64);
     for Line(toggle, cube) in input.iter() {
         //println!("{:?}", cube.constrained(&constraint));
-        if let Some(cube) = cube.constrained(&constraint) {
+        if let Some(cube) = cube.octree_key().constrained(&constraint) {
             match toggle {
                 Toggle::On => octy.set_cube(cube, Some(())),
                 Toggle::Off => octy.set_cube(cube, None),
@@ -40,20 +76,42 @@ fn part1(input: &[Line]) -> usize {
     octy.count(|_| true)
 }
 
-fn part2(input: &[Line]) -> usize {
-    let mut octy = Octree::new(16384);
+fn part2_cubes(input: &[Line]) -> i64 {
+    let mut cubes: Vec<Cuboid> = Vec::with_capacity(1024);
+    let mut next_cubes: Vec<Cuboid> = Vec::with_capacity(1024);
+
+    for Line(toggle, cube) in input.iter() {
+        next_cubes.clear();
+
+        for c in cubes.iter() {
+            next_cubes.extend_from_slice(&c.subtract(cube));
+        }
+
+        if let Toggle::On = toggle {
+            next_cubes.push(*cube);
+        }
+
+        swap(&mut cubes, &mut next_cubes)
+    }
+
+    cubes.iter().map(|c| c.volume()).sum()
+}
+
+#[allow(dead_code)]
+fn part2_octree(input: &[Line]) -> usize {
+    let mut octy = Octree::new(131072);
 
     for Line(toggle, cube) in input.iter() {
         match toggle {
-            Toggle::On => octy.set_cube(*cube, Some(())),
-            Toggle::Off => octy.set_cube(*cube, None),
+            Toggle::On => octy.set_cube(cube.octree_key(), Some(())),
+            Toggle::Off => octy.set_cube(cube.octree_key(), None),
         }
     }
 
     octy.count(|_| true)
 }
 
-struct Line(Toggle, Cube);
+struct Line(Toggle, Cuboid);
 
 enum Toggle {
     On,
@@ -63,22 +121,27 @@ enum Toggle {
 fn parse_line(input: &[u8]) -> Option<(Line, &[u8])> {
     let (on_off, input) = parser::word(input)?;
     let (_, input) = parser::expect_bytes(input, b"x=")?;
-    let (min_x, input) = parser::int::<isize>(input)?;
+    let (min_x, input) = parser::int::<i64>(input)?;
     let (_, input) = parser::expect_bytes(input, b"..")?;
-    let (max_x, input) = parser::int::<isize>(input)?;
+    let (max_x, input) = parser::int::<i64>(input)?;
     let (_, input) = parser::expect_bytes(input, b",y=")?;
-    let (min_y, input) = parser::int::<isize>(input)?;
+    let (min_y, input) = parser::int::<i64>(input)?;
     let (_, input) = parser::expect_bytes(input, b"..")?;
-    let (max_y, input) = parser::int::<isize>(input)?;
+    let (max_y, input) = parser::int::<i64>(input)?;
     let (_, input) = parser::expect_bytes(input, b",z=")?;
-    let (min_z, input) = parser::int::<isize>(input)?;
+    let (min_z, input) = parser::int::<i64>(input)?;
     let (_, input) = parser::expect_bytes(input, b"..")?;
-    let (max_z, input) = parser::int::<isize>(input)?;
+    let (max_z, input) = parser::int::<i64>(input)?;
     let (_, input) = parser::rest_of_line(input)?;
 
+    let cuboid = Cuboid {
+        min: CuboidPoint([min_x, min_y, min_z]),
+        max: CuboidPoint([max_x + 1, max_y + 1, max_z + 1]),
+    };
+
     match on_off {
-        b"on" => Some((Line(Toggle::On, Cube(Point(min_x, min_y, min_z), Point(max_x + 1, max_y + 1, max_z + 1))), input)),
-        b"off" => Some((Line(Toggle::Off, Cube(Point(min_x, min_y, min_z), Point(max_x + 1, max_y + 1, max_z + 1))), input)),
+        b"on" => Some((Line(Toggle::On, cuboid), input)),
+        b"off" => Some((Line(Toggle::Off, cuboid), input)),
         _ => None
     }
 }
@@ -94,7 +157,7 @@ fn parse_input(input: &[u8]) -> Vec<Line> {
     lines
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct Cuboid {
     min: CuboidPoint,
     max: CuboidPoint,
@@ -114,21 +177,36 @@ impl Cuboid {
             && (self.min.z() < other.max.z())
     }
 
+    fn subtract(&self, other: &Cuboid) -> SmallVec<[Cuboid; 9]> {
+        if self.overlaps(other) {
+            let mut list = self.split_by(other);
+            list.pop();
+            list
+        } else {
+            smallvec![*self]
+        }
+    }
+
     /// split_by splits the cube into upto 9 slices. The last slice will be the one that
     /// overlaps the other cube.
     fn split_by(&self, other: &Cuboid) -> SmallVec<[Cuboid; 9]> {
         if self.overlaps(other) {
             let mut cubes = SmallVec::new();
             let mut middle = *self;
-            for i in 0..2 {
+            for i in 0..3 {
                 let slices = middle.slash_twice(i, other.min.0[i], other.max.0[i]);
                 for slice in slices.iter().skip(1) {
-                    cubes.push(*slice);
+                    if !slice.is_flat() {
+                        cubes.push(*slice);
+                    }
                 }
                 middle = slices[0];
             }
 
-            cubes.push(middle);
+            if !middle.is_flat() {
+                cubes.push(middle);
+            }
+
             cubes
         } else {
             smallvec![*self]
@@ -146,13 +224,17 @@ impl Cuboid {
                 smallvec![b, a]
             }
         } else {
-            smallvec![a]
+            let (b, c) = a.slash(i, c2);
+            if let Some(c) = c {
+                smallvec![b, c]
+            } else {
+                smallvec![a]
+            }
         }
     }
 
-
     fn slash(&self, i: usize, c: i64) -> (Cuboid, Option<Cuboid>) {
-        if c < self.min.0[i] || c > self.max.0[i] {
+        if c <= self.min.0[i] || c >= self.max.0[i] {
             (*self, None)
         } else {
             let mut a = *self;
@@ -165,10 +247,45 @@ impl Cuboid {
         }
     }
 
+    fn is_flat(&self) -> bool {
+        for i in 0..3 {
+            if self.min.0[i] == self.max.0[i] {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn octree_key(&self) -> Cube {
+        Cube(
+            Point(self.min.x() as isize, self.min.y() as isize, self.min.z() as isize),
+            Point(self.max.x() as isize, self.max.y() as isize, self.max.z() as isize),
+        )
+    }
+
+    fn constrained(&self, other: &Cuboid) -> Option<Cuboid> {
+        if self.overlaps(other) {
+            Some(Cuboid {
+                min: CuboidPoint([
+                    max(self.min.0[0], other.min.0[0]),
+                    max(self.min.0[1], other.min.0[1]),
+                    max(self.min.0[2], other.min.0[2]),
+                ]),
+                max: CuboidPoint([
+                    min(self.max.0[0], other.max.0[0]),
+                    min(self.max.0[1], other.max.0[1]),
+                    min(self.max.0[2], other.max.0[2]),
+                ]),
+            })
+        } else {
+            None
+        }
+    }
 }
 
-#[derive(Copy, Clone)]
-struct CuboidPoint ([i64; 3]);
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+struct CuboidPoint([i64; 3]);
 
 impl CuboidPoint {
     fn x(&self) -> i64 {
@@ -205,11 +322,184 @@ mod tests {
     use super::*;
 
     #[test]
-    fn slice_by_works(){}
+    fn slice_by_conserves_volume() {
+        let cuboid = Cuboid {
+            min: CuboidPoint([-14, -13, -12]),
+            max: CuboidPoint([17, 33, 23]),
+        };
+
+        for x in -15..15 {
+            for y in -15..15 {
+                for z in -15..15 {
+                    let cuboid2 = Cuboid {
+                        min: CuboidPoint([x, y, z]),
+                        max: CuboidPoint([x + 15, y + 15, z + 15]),
+                    };
+
+                    let cuboids = cuboid.split_by(&cuboid2);
+                    assert_eq!(cuboids.iter().map(|c| c.volume()).sum::<i64>(), cuboid.volume());
+
+                    for (i, c1) in cuboids.iter().enumerate() {
+                        for c2 in cuboids.iter().skip(i + 1) {
+                            assert_eq!(c1.overlaps(c2), false);
+                        }
+                        println!("\n{:?}\n{:?}", c1, cuboid);
+                        assert_eq!(c1.overlaps(&cuboid), true);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn split_by_corner() {
+        let c1 = Cuboid {
+            min: CuboidPoint([10, 10, 10]),
+            max: CuboidPoint([15, 15, 15]),
+        };
+        let c2 = Cuboid {
+            min: CuboidPoint([13, 13, 13]),
+            max: CuboidPoint([17, 17, 17]),
+        };
+
+        let split_cubes = c1.split_by(&c2);
+
+        assert_eq!(split_cubes.len(), 4);
+        assert_eq!(split_cubes.as_slice(), [
+            Cuboid { min: CuboidPoint([10, 10, 10]), max: CuboidPoint([13, 15, 15]) },
+            Cuboid { min: CuboidPoint([13, 10, 10]), max: CuboidPoint([15, 13, 15]) },
+            Cuboid { min: CuboidPoint([13, 13, 10]), max: CuboidPoint([15, 15, 13]) },
+            Cuboid { min: CuboidPoint([13, 13, 13]), max: CuboidPoint([15, 15, 15]) },
+        ].as_slice())
+    }
+
+    #[test]
+    fn slash_twice_middle() {
+        let c1 = Cuboid {
+            min: CuboidPoint([10, 10, 10]),
+            max: CuboidPoint([15, 15, 15]),
+        };
+
+        let split = c1.slash_twice(0, 12, 14);
+        assert_eq!(split.as_slice(), [
+            Cuboid {
+                min: CuboidPoint([12, 10, 10]),
+                max: CuboidPoint([14, 15, 15]),
+            },
+            Cuboid {
+                min: CuboidPoint([10, 10, 10]),
+                max: CuboidPoint([12, 15, 15]),
+            },
+            Cuboid {
+                min: CuboidPoint([14, 10, 10]),
+                max: CuboidPoint([15, 15, 15]),
+            },
+        ].as_slice());
+    }
+
+    #[test]
+    fn slash_twice_side() {
+        let c1 = Cuboid {
+            min: CuboidPoint([10, 10, 10]),
+            max: CuboidPoint([15, 15, 15]),
+        };
+
+        let split = c1.slash_twice(0, 12, 16);
+        assert_eq!(split.as_slice(), [
+            Cuboid {
+                min: CuboidPoint([12, 10, 10]),
+                max: CuboidPoint([15, 15, 15]),
+            },
+            Cuboid {
+                min: CuboidPoint([10, 10, 10]),
+                max: CuboidPoint([12, 15, 15]),
+            },
+        ].as_slice());
+    }
+
+    #[test]
+    fn slash_twice_nonoverlapping() {
+        let c1 = Cuboid {
+            min: CuboidPoint([10, 10, 10]),
+            max: CuboidPoint([15, 15, 15]),
+        };
+
+        let split = c1.slash_twice(0, 22, 32);
+        assert_eq!(split.as_slice(), [
+            Cuboid {
+                min: CuboidPoint([10, 10, 10]),
+                max: CuboidPoint([15, 15, 15]),
+            }
+        ].as_slice());
+    }
+
+    #[test]
+    fn slash_twice_adjacent() {
+        let c1 = Cuboid {
+            min: CuboidPoint([10, 10, 10]),
+            max: CuboidPoint([15, 15, 15]),
+        };
+
+        let split = c1.slash_twice(0, 15, 32);
+        assert_eq!(split.as_slice(), [
+            Cuboid {
+                min: CuboidPoint([10, 10, 10]),
+                max: CuboidPoint([15, 15, 15]),
+            }
+        ].as_slice());
+
+        let split = c1.slash_twice(0, 0, 10);
+        assert_eq!(split.as_slice(), [
+            Cuboid {
+                min: CuboidPoint([10, 10, 10]),
+                max: CuboidPoint([15, 15, 15]),
+            }
+        ].as_slice());
+    }
+
+    #[test]
+    fn subtract_once_works() {
+        let c1 = Cuboid {
+            min: CuboidPoint([10, 10, 10]),
+            max: CuboidPoint([13, 13, 13]),
+        };
+        let c2 = Cuboid {
+            min: CuboidPoint([11, 11, 11]),
+            max: CuboidPoint([14, 14, 14]),
+        };
+
+        for c in c1.subtract(&c2) {
+            println!("{:?} {}", c, c.volume());
+        }
+
+        assert_eq!(
+            c1.subtract(&c2).iter()
+                .map(|v| v.volume())
+                .sum::<i64>(),
+            19,
+        );
+    }
+
+    #[test]
+    fn subtract_corner() {
+        let c1 = Cuboid {
+            min: CuboidPoint([11, 11, 11]),
+            max: CuboidPoint([14, 14, 14]),
+        };
+        let c2 = Cuboid {
+            min: CuboidPoint([9, 9, 9]),
+            max: CuboidPoint([12, 12, 12]),
+        };
+
+        println!("{:?}", c1.split_by(&c2));
+        println!("{:?}", c2.split_by(&c1));
+
+        assert_eq!(c1.split_by(&c2).len(), 4);
+    }
 
     #[test]
     fn slash_conserves_volume() {
-        let cuboid = Cuboid{
+        let cuboid = Cuboid {
             min: CuboidPoint([-14, -13, -12]),
             max: CuboidPoint([17, 33, 23]),
         };
@@ -226,9 +516,36 @@ mod tests {
     }
 
     #[test]
-    fn part1_works_on_example() {
+    fn part1_octree_works_on_example() {
         let input = parse_input(BIG_EXAMPLE_1);
-        assert_eq!(part1(&input), 590784);
+        assert_eq!(part1_octree(&input), 590784);
+    }
+
+    #[test]
+    fn part1_cubes_works_on_example() {
+        let input = parse_input(BIG_EXAMPLE_1);
+        assert_eq!(part1_cubes(&input), 590784);
+    }
+
+    #[test]
+    fn part1_cubes_works_on_second_example() {
+        let input = parse_input(BIG_EXAMPLE_2);
+        assert_eq!(part1_cubes(&input), 474140);
+    }
+
+    #[test]
+    fn part1_cubes_works_on_simple_example() {
+        let input = parse_input(SIMPLE_EXAMPLE_1);
+        assert_eq!(part1_cubes(&input[..1]), 27);
+        assert_eq!(part1_cubes(&input[..2]), 46);
+        assert_eq!(part1_cubes(&input[..3]), 38);
+        assert_eq!(part1_cubes(&input), 39);
+    }
+
+    #[test]
+    fn part2_cubes_works_on_example() {
+        let input = parse_input(BIG_EXAMPLE_2);
+        assert_eq!(part2_cubes(&input), 2758514936282235);
     }
 
     const BIG_EXAMPLE_1: &[u8] = b"on x=-20..26,y=-36..17,z=-47..7
@@ -317,7 +634,7 @@ on x=-53470..21291,y=-120233..-33476,z=-44150..38147
 off x=-93533..-4276,y=-16170..68771,z=-104985..-24507
 ";
 
-    const EXAMPLE_SIMPLE_1: &[u8] = b"on x=10..12,y=10..12,z=10..12
+    const SIMPLE_EXAMPLE_1: &[u8] = b"on x=10..12,y=10..12,z=10..12
 on x=11..13,y=11..13,z=11..13
 off x=9..11,y=9..11,z=9..11
 on x=10..10,y=10..10,z=10..10

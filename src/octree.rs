@@ -1,5 +1,5 @@
-use smallvec::{SmallVec, smallvec};
-use std::cmp::{max, min, Ordering};
+use smallvec::{SmallVec};
+use std::cmp::{max, min};
 use std::ops::{Add, Sub, Mul};
 
 const SUB_EDGES: [Cube; 8] = [
@@ -57,12 +57,6 @@ struct Octant<T> {
     factor: isize,
     center: Point,
     subs: [usize; 8],
-}
-
-pub struct Batch<T> {
-    min: Point,
-    max: Point,
-    value: Option<T>,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -399,12 +393,6 @@ impl Cube {
             && (self.0.y() < other.1.y())
             && (self.1.z() > other.0.z())
             && (self.0.z() < other.1.z())
-    }
-
-    fn volume(&self) -> isize {
-        (self.1.0 - self.0.0)
-            * (self.1.1 - self.0.1)
-            * (self.1.2 - self.0.2)
     }
 
     pub fn constrained(&self, other: &Cube) -> Option<Cube> {
