@@ -72,6 +72,19 @@ pub struct Point(pub isize, pub isize, pub isize);
 pub struct Cube(pub Point, pub Point);
 
 impl<T> Octree<T> where T: Copy + std::cmp::PartialEq {
+    pub fn reset(&mut self) {
+        let old_factor = self.octants[0].factor;
+
+        self.free_list.clear();
+        self.octants.clear();
+        self.octants.push(Octant{
+            factor: old_factor,
+            center: Point(0, 0, 0),
+            subs: [0; 8],
+            value: None,
+        });
+    }
+
     pub fn get(&self, p: Point) -> Option<T> {
         let mut index = 0;
         loop {
