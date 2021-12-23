@@ -7,7 +7,7 @@ fn main() {
 
     let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input));
     let (res_p1, dur_p1, dur_p1c) = run_many(10, || part1(&input));
-    let (res_p2, dur_p2, dur_p2c) = run_many(10, || part2(&input));
+    let (res_p2, dur_p2, dur_p2c) = run_many(1, || part2(&input));
 
     print_result("P1", res_p1);
     print_result("P2", res_p2);
@@ -21,7 +21,7 @@ fn main() {
 fn part1(input: &[Line]) -> usize {
     let constraint = Cube(
         Point(-50, -50, -50),
-        Point(50, 50, 50),
+        Point(51, 51, 51),
     );
 
     let mut octy = Octree::new(64);
@@ -39,7 +39,15 @@ fn part1(input: &[Line]) -> usize {
 }
 
 fn part2(input: &[Line]) -> usize {
-    0
+    let mut octy = Octree::new(1 << 18);
+    for Line(toggle, cube) in input.iter() {
+        match toggle {
+            Toggle::On => octy.set_cube(*cube, Some(())),
+            Toggle::Off => octy.set_cube(*cube, None),
+        }
+    }
+
+    octy.count(|_| true)
 }
 
 struct Line(Toggle, Cube);
@@ -66,8 +74,8 @@ fn parse_line(input: &[u8]) -> Option<(Line, &[u8])> {
     let (_, input) = parser::rest_of_line(input)?;
 
     match on_off {
-        b"on" => Some((Line(Toggle::On, Cube(Point(min_x, min_y, min_z), Point(max_x, max_y, max_z))), input)),
-        b"off" => Some((Line(Toggle::Off, Cube(Point(min_x, min_y, min_z), Point(max_x, max_y, max_z))), input)),
+        b"on" => Some((Line(Toggle::On, Cube(Point(min_x, min_y, min_z), Point(max_x+1, max_y+1, max_z+1))), input)),
+        b"off" => Some((Line(Toggle::Off, Cube(Point(min_x, min_y, min_z), Point(max_x+1, max_y+1, max_z+1))), input)),
         _ => None
     }
 }
