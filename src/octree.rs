@@ -36,15 +36,6 @@ const SUB_CENTERS2: [Point; 8] = [
 ];
 
 
-// -z, -y, -x = 000
-// -z, -y, x = 001
-// -z, y, -x = 010
-// -z, y, x = 011
-// z, -y, -x = 100
-// z, -y, x = 101
-// z, y, -x = 110
-// z, y, x = 111
-
 #[derive(Debug, Eq, PartialEq)]
 pub struct Octree<T> {
     octants: Vec<Octant<T>>,
@@ -427,9 +418,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn centers_are_correct() {
+    fn centers_are_correct_kinda() {
         let a = Octant::<()> { center: Point(4, 4, 4), factor: 4, subs: [0; 8], value: None };
-        let b = Octant::<()> { center: Point(4, 4, 4), factor: 4, subs: [0; 8], value: None };
 
         assert_eq!(a.sub_center(7), Point(6, 6, 6));
     }
@@ -517,17 +507,6 @@ mod tests {
         assert_eq!(octy.count(|v| *v == 64), 4095);
         octy.set(Point(6, 7, 4), None);
         assert_eq!(octy.count(|v| *v == 64), 4094);
-    }
-
-    #[test]
-    fn thin_bois_work() {
-        let mut octy = Octree::new(16);
-        octy.set_cube(Cube(
-            Point(1, 2, 3),
-            Point(1, 2, 33),
-        ), Some(30));
-
-        assert_eq!(octy.count(|_| true), 30);
     }
 
     #[test]
