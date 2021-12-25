@@ -165,31 +165,7 @@ fn run_step(z: i64, w: i64, idx: usize) -> i64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{reverse_step, run_step, run_step_slow};
-
-    #[test]
-    fn can_reverse() {
-        for idx in 0..12 {
-            for z in -77..77 {
-                for w in 1..9 {
-                    println!("{},{},{}", idx, z, w);
-
-                    assert_eq!(
-                        run_step(
-                            run_step(
-                                run_step(z, w, idx),
-                                w, idx + 1),
-                            w, idx + 2,
-                        ) % 26,
-                        run_step(
-                            run_step(z, w, idx + 1),
-                            w, idx + 2,
-                        ) % 26,
-                    )
-                }
-            }
-        }
-    }
+    use super::*;
 
     #[test]
     fn optimization_is_correct() {

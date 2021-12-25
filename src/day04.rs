@@ -144,7 +144,6 @@ impl Bingo {
                 indices: vec![0; numbers.len() + 1],
             };
 
-
             pos += parse_u32s_amount(&input[pos..], &mut curr_board.numbers, 25);
             for (i, n) in curr_board.numbers.iter().enumerate() {
                 curr_board.indices[*n as usize] = i+1;
@@ -179,7 +178,8 @@ mod tests {
 10 16 15  9 19
 18  8 23 26 20
 22 11 13  6  5
- 2  0 12  3  7";
+ 2  0 12  3  7
+ ";
 
     #[test]
     fn test_part1() {

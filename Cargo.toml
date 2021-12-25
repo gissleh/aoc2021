@@ -121,9 +121,9 @@ path = "src/year2018-day15.rs"
 name = "year2019-day20"
 path = "src/year2019-day20.rs"
 
-[[bin]]
-name = "year2018-day17"
-path = "src/year2018-day17.rs"
+#[[bin]]
+#name = "year2018-day17"
+#path = "src/year2018-day17.rs"
 
 [dependencies]
 radix-heap = "0.4.1"

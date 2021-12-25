@@ -237,9 +237,4 @@ mod tests {
     fn test_part1_bigboy() {
         assert_eq!(part1(&parse_input(&SAMPLE_INPUT_BIG1)), 45558285);
     }
-
-    #[test]
-    fn test_part2_bigboy() {
-        assert_eq!(part1(&parse_input(&SAMPLE_INPUT_BIG1)), 69665558);
-    }
 }
