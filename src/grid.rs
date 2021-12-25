@@ -70,8 +70,19 @@ impl<T> FixedGrid<T>
 
         &mut self.data.as_mut_slice()[left..right]
     }
+    pub fn get_wrapping(&self, x: usize, y: usize) -> &T {
+        unsafe { self.get_unchecked(x % self.width, y % self.height) }
+    }
     pub unsafe fn get_unchecked_mut(&mut self, x: usize, y: usize) -> &mut T {
         self.data.get_unchecked_mut(y * self.width + x)
+    }
+    pub fn get_wrapping_mut(&mut self, x: usize, y: usize) -> &T {
+        unsafe { self.get_unchecked_mut(x % self.width, y % self.height) }
+    }
+    pub fn swap_wrapping(&mut self, p1: (usize, usize), p2: (usize, usize)) {
+        let index1 = (p1.1 % self.height) * self.width + (p1.0 % self.width);
+        let index2 = (p2.1 % self.height) * self.width + (p2.0 % self.width);
+        self.data.swap(index1, index2);
     }
     pub fn lines(&self) -> impl Iterator<Item=&[T]> {
         self.data.chunks(self.width)
@@ -213,6 +224,20 @@ impl<T> FixedGrid<T>
             width,
             height,
         }
+    }
+
+    pub fn parse_bytes(data: &[u8], cb: impl Fn(u8) -> T) -> FixedGrid<T> {
+        let width = data.iter().take_while(|b| **b != b'\n').count();
+        let data: Vec<T> = data.iter().filter(|b| **b != b'\n').map(|v| cb(*v)).collect();
+
+        Self::from(width, data.len() / width, data)
+    }
+
+    pub fn parse_str(data: &str, cb: impl Fn(char) -> T) -> FixedGrid<T> {
+        let width = data.chars().take_while(|b| *b != '\n').count();
+        let data: Vec<T> = data.chars().map(|v| cb(v)).collect();
+
+        Self::from(width, data.len() / width, data)
     }
 }
 
