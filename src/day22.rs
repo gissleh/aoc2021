@@ -25,7 +25,7 @@ fn main() {
     print_time_cold("P1 (Cubes)", dur_p1_c, dur_p1c_c);
     //print_time_cold("P2 (Octree)", dur_p2, dur_p2c);
     print_time_cold("P2 (Cubes)", dur_p2_c, dur_p2c_c);
-    //print_time_cold("Total", dur_p + dur_p1 + dur_p2, dur_pc + dur_p1c + dur_p2c);
+    print_time_cold("Total (Cubes)", dur_p + dur_p1_c + dur_p2_c, dur_pc + dur_p1c_c + dur_p2c_c);
 }
 
 fn part1_cubes(input: &[Line]) -> i64 {
