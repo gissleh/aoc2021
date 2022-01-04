@@ -8,9 +8,10 @@ CURL="curl -H 'authority: adventofcode.com' -H 'dnt: 1' -H 'user-agent: Mozilla/
 
 mkdir -p input
 
-CURRENT_DAY=$(date +"%e")
+# CURRENT_DAY=$(date +"%e")
 
-for i in $(seq -f "%02g" 1 $CURRENT_DAY)
+# for i in $(seq -f "%02g" 1 $CURRENT_DAY)
+for i in $(seq -f "%02g" 1 25)
 do
   i_nopad=${i##+(0)}
 

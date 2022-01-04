@@ -1,7 +1,7 @@
 use std::cmp::{max, min};
 use std::mem::swap;
 use common::aoc::{print_result, run_many, print_time_cold};
-use common::octree::{Cube, Octree, Point};
+use common::octree::{IndexCube, Octree, IndexPoint};
 use common::parser;
 use std::ops::{Sub, Add};
 use smallvec::{SmallVec, smallvec};
@@ -12,18 +12,18 @@ fn main() {
     let (input, dur_p, dur_pc) = run_many(1000, || parse_input(input));
     let (res_p1, dur_p1, dur_p1c) = run_many(100, || part1_octree(&input));
     let (res_p1_c, dur_p1_c, dur_p1c_c) = run_many(100, || part1_cubes(&input));
-    //let (res_p2, dur_p2, dur_p2c) = run_many(1, || part2_octree(&input));
+    let (res_p2, dur_p2, dur_p2c) = run_many(1, || part2_octree(&input));
     let (res_p2_c, dur_p2_c, dur_p2c_c) = run_many(100, || part2_cubes(&input));
 
     print_result("P1 (Octree)", res_p1);
     print_result("P1 (Cubes)", res_p1_c);
-    //print_result("P2 (Octree)", res_p2);
+    print_result("P2 (Octree)", res_p2);
     print_result("P2 (Cubes)", res_p2_c);
 
     print_time_cold("Parse", dur_p, dur_pc);
     print_time_cold("P1 (Octree)", dur_p1, dur_p1c);
     print_time_cold("P1 (Cubes)", dur_p1_c, dur_p1c_c);
-    //print_time_cold("P2 (Octree)", dur_p2, dur_p2c);
+    print_time_cold("P2 (Octree)", dur_p2, dur_p2c);
     print_time_cold("P2 (Cubes)", dur_p2_c, dur_p2c_c);
     print_time_cold("Total (Cubes)", dur_p + dur_p1_c + dur_p2_c, dur_pc + dur_p1c_c + dur_p2c_c);
 }
@@ -57,12 +57,12 @@ fn part1_cubes(input: &[Line]) -> i64 {
 }
 
 fn part1_octree(input: &[Line]) -> usize {
-    let constraint = Cube(
-        Point(-50, -50, -50),
-        Point(51, 51, 51),
+    let constraint = IndexCube(
+        IndexPoint(-50, -50, -50),
+        IndexPoint(51, 51, 51),
     );
 
-    let mut octy = Octree::new(64);
+    let mut octy = Octree::new(64, None);
     for Line(toggle, cube) in input.iter() {
         //println!("{:?}", cube.constrained(&constraint));
         if let Some(cube) = cube.octree_key().constrained(&constraint) {
@@ -99,7 +99,7 @@ fn part2_cubes(input: &[Line]) -> i64 {
 
 #[allow(dead_code)]
 fn part2_octree(input: &[Line]) -> usize {
-    let mut octy = Octree::new(131072);
+    let mut octy = Octree::new(131072, None);
 
     for Line(toggle, cube) in input.iter() {
         match toggle {
@@ -257,10 +257,10 @@ impl Cuboid {
         false
     }
 
-    fn octree_key(&self) -> Cube {
-        Cube(
-            Point(self.min.x() as isize, self.min.y() as isize, self.min.z() as isize),
-            Point(self.max.x() as isize, self.max.y() as isize, self.max.z() as isize),
+    fn octree_key(&self) -> IndexCube {
+        IndexCube(
+            IndexPoint(self.min.x() as isize, self.min.y() as isize, self.min.z() as isize),
+            IndexPoint(self.max.x() as isize, self.max.y() as isize, self.max.z() as isize),
         )
     }
 
